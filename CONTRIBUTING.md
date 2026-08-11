@@ -34,16 +34,16 @@ Tests requiring a user-owned installation use the `local_game` marker:
 
 ```powershell
 $env:MUSEDASH_GAME_DIR = "E:\SteamLibrary\steamapps\common\Muse Dash"
-pytest -m local_game -q
+.\.venv\Scripts\python.exe -m pytest -m local_game -q
 ```
 
 Before opening a change, run:
 
 ```powershell
-pytest -m "not local_game" -q
-python -m compileall -q src tests
-python -m build
-python tools/audit_release_archives.py dist/*
+.\.venv\Scripts\python.exe -m pytest -m "not local_game" -q
+.\.venv\Scripts\python.exe -m compileall -q src tests tools
+.\.venv\Scripts\python.exe -m build
+.\.venv\Scripts\python.exe tools/audit_release_archives.py dist/*
 ```
 
 Inspect wheel and sdist contents. They must not contain `diagnostics/`,

@@ -1,233 +1,208 @@
+<div align="center">
+
 # MuseDashChartExtractor
 
-MuseDashChartExtractor 是一个纯 Python、只读、离线的 Muse Dash 官方谱面提取研究项目。
+[![GitHub release](https://img.shields.io/github/v/release/DDZmumo/MuseChartExtractor?display_name=tag&sort=semver)](https://github.com/DDZmumo/MuseChartExtractor/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/DDZmumo/MuseChartExtractor/total?color=4c6ef5)](https://github.com/DDZmumo/MuseChartExtractor/releases/latest)
+[![CI](https://github.com/DDZmumo/MuseChartExtractor/actions/workflows/ci.yml/badge.svg)](https://github.com/DDZmumo/MuseChartExtractor/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![License](https://img.shields.io/github/license/DDZmumo/MuseChartExtractor)](LICENSE)
 
-项目目标是从用户自行拥有的 Windows 版 Muse Dash 本地安装资源中，定位、解析、验证并导出官方谱面数据。它不会启动游戏、安装 Mod、注入 DLL、读取运行时内存或修改游戏文件，也不提供任何官方资源下载或再分发。
+**纯 Python、只读、离线的 Muse Dash 官方谱面提取器。**
 
-> 当前状态：Phase 0–10 和 M0–M9 已达到。首个公共版本 [v0.1.0](https://github.com/DDZmumo/MuseChartExtractor/releases/tag/v0.1.0) 对应 revision `9158640`，其 Windows/Linux、Python 3.10–3.13 测试、package 和 release jobs 均由 GitHub Actions 真实通过。当前源码已分别完成两个 exact 资源 fingerprint 的 Phase 1–9 证据链；`v0.1.0` 发布物只包含第一个 profile，第二个 profile 尚未发布。最新 fingerprint 的 2,331 张 StageInfo 谱面全部可严格离线解析和分组；2,330 张已恢复 song/chart 身份并导出，`tutorial_v2_map1` 明确保留为 unresolved/uncertain。Canonical Chart schema `1.1.0` 使用单一 raw table 和 index-only event 引用，并由完整批量双跑及逐文件 raw-accounting 审计验证。M7 仍只是三张 Urban Magic 谱的 source、结构、raw accounting 与 aggregate combo 部分验证，不是全库逐事件 100% 精确声明。正式支持仅限 [supported-versions.md](docs/supported-versions.md) 列出的完整 fingerprint。
+从用户自行拥有的 Windows 版 Muse Dash 本地资源中定位、解析、验证并导出谱面，
+不启动游戏，不安装 Mod，不注入 DLL，不读取运行时内存，也不修改游戏文件。
 
-## 开发路线
+[快速开始](#快速开始) · [功能](#功能) · [工作原理](#工作原理) · [支持状态](#支持状态) · [项目文档](#项目文档)
 
-严格按 [ROADMAP.md](ROADMAP.md) 推进：先建立可复现的资源 inventory，再调查 Unity / Addressables、发现候选、恢复序列化结构，最终以离线解析出第一张真实官方谱面作为首个核心成功门槛。
+</div>
 
-## 环境
+---
 
-- Python 3.10+
-- 用户自行拥有并安装的 Windows 版 Muse Dash（只有本机资源调查需要）
+## 快速开始
 
-资源 inventory 本身只使用 Python 标准库；Phase 2 的只读 Unity metadata probe 使用 UnityPy。开发环境可安装：
+### 安装
 
-```powershell
-python -m pip install -e ".[dev]"
-```
+需要 Python 3.10 或更高版本，以及用户自行安装的 Windows 版 Muse Dash。
+当前项目通过 GitHub Releases 分发，尚未声明发布到 PyPI。
 
-`0.1.0` 的发布状态以项目的
-[GitHub Releases](https://github.com/DDZmumo/MuseChartExtractor/releases) 为准。
-本地构建成功不等于公共发布，也不表示已经上传到 Python 包索引：
+#### 稳定版 `v0.1.0`
 
-```powershell
-python -m build
-python -m pip install dist\musedash_chart_extractor-0.1.0-py3-none-any.whl
-musedash-chart-extractor --help
-```
-
-首个 GitHub Release wheel 可直接安装；项目当前未声明已发布到 PyPI：
+该版本包含第一个正式资源 profile 和对应的 Phase 1-9 提取流程：
 
 ```powershell
 python -m pip install "https://github.com/DDZmumo/MuseChartExtractor/releases/download/v0.1.0/musedash_chart_extractor-0.1.0-py3-none-any.whl"
+musedash-chart-extractor --version
 ```
 
-## 使用
+#### 当前 `main`（Unreleased）
 
-从源码运行帮助：
+第二个正式资源 profile、未知 fingerprint 的完整 research batch 和独立全量审计目前只在
+当前源码中提供：
 
 ```powershell
-$env:PYTHONPATH = "src"
-python -m musedash_chart_extractor --help
+git clone https://github.com/DDZmumo/MuseChartExtractor.git
+cd MuseChartExtractor
+python -m pip install -e ".[dev]"
 ```
 
-生成只读资源 inventory：
+除明确标注 `v0.1.0` 的内容外，下文描述当前 `main` 的能力。
+
+### 扫描本地资源
+
+安装目录可位于任意 Steam Library，不需要固定盘符：
 
 ```powershell
-$env:PYTHONPATH = "src"
-python -m musedash_chart_extractor scan `
-  --game-dir "E:\SteamLibrary\steamapps\common\Muse Dash" `
+$GameDir = "D:\SteamLibrary\steamapps\common\Muse Dash"
+
+musedash-chart-extractor scan `
+  --game-dir $GameDir `
   --output-dir diagnostics
 ```
 
-输出：
+扫描只读取文件并生成稳定排序的 inventory 与完整内容 fingerprint：
 
 - `diagnostics/resource_inventory.jsonl`
 - `diagnostics/resource_summary.json`
 
-summary 包含一个与安装盘符无关的组合 SHA-256 fingerprint；它由稳定排序的相对路径、文件大小和各文件 SHA-256 共同生成，用于判断两次扫描是否对应同一组本地资源。
+### 完整提取
 
-Phase 2 metadata probe（只枚举，不导出对象内容）：
-
-```powershell
-.\.venv\Scripts\python.exe -m musedash_chart_extractor probe `
-  --game-dir "E:\SteamLibrary\steamapps\common\Muse Dash" `
-  --output-dir diagnostics
-```
-
-额外输出：
-
-- `diagnostics/bundle_inventory.jsonl`
-- `diagnostics/serialized_file_inventory.jsonl`
-- `diagnostics/object_type_summary.json`
-- `diagnostics/addressables_index.json`
-
-生成有来源、可解释评分的 StageInfo 候选清单：
+正式批量提取要求同一 fingerprint 下的 Unity inventory、StageInfo candidates、
+song index 和 grouping census 全部通过门禁：
 
 ```powershell
-.\.venv\Scripts\python.exe -m musedash_chart_extractor candidates `
-  --game-dir "E:\SteamLibrary\steamapps\common\Muse Dash" `
-  --output-dir diagnostics
+musedash-chart-extractor probe --game-dir $GameDir --output-dir diagnostics
+musedash-chart-extractor candidates --game-dir $GameDir --output-dir diagnostics
+musedash-chart-extractor index --game-dir $GameDir --output diagnostics/song_chart_index.json
+musedash-chart-extractor grouping-census --game-dir $GameDir --output-dir diagnostics
+musedash-chart-extractor extract-all --game-dir $GameDir --output extracted
 ```
 
-输出 `diagnostics/chart_candidates.jsonl`。评分表示当前结构信号中实际出现的比例，不是“属于谱面的概率”；每条记录均保留 source SHA-256、container、PathID、MonoScript 身份、证据和反证，但不会写出 `SerializedBytes`。
+结果写入 `extracted/charts/<song_id>/<chart_id>.json`，最后原子写入
+`extracted/manifest.json`。完整无损 JSON 体积较大：最新 fingerprint 的 2,330 张谱面
+约占 13.1 GiB。重复验证应原地覆盖，不要保留重复输出树。
 
-严格恢复一个候选对象的 Odin 结构并生成有限样本诊断：
+> [!IMPORTANT]
+> `extracted/` 含用户本机官方衍生数据，已被 Git 忽略。请勿提交、发布或再分发完整谱面、
+> AssetBundle、音频、Texture、DLC 内容或可还原这些内容的 dump。
 
-```powershell
-.\.venv\Scripts\python.exe -m musedash_chart_extractor inspect-stageinfo `
-  --game-dir "E:\SteamLibrary\steamapps\common\Muse Dash" `
-  --source "MuseDash_Data/StreamingAssets/aa/StandaloneWindows64/music_urban_magic_assets_all.bundle" `
-  --path-id 8668625138739021960 `
-  --output-dir diagnostics
+全部子命令、输出文件和研究模式说明见
+[CLI Reference](docs/cli-reference.md)。
+
+## 功能
+
+- **纯离线 Disk-to-Parser**：不依赖游戏进程、ModLoader、Hook 或内存读取。
+- **确定性资源清单**：记录相对路径、大小、SHA-256、magic 与完整安装 fingerprint。
+- **Unity / Addressables 解析**：枚举 bundle、serialized file、对象类型与 Addressables 关系。
+- **严格 Odin Binary 恢复**：未知 tag、截断、计数或节点失配会带上下文失败，不猜格式。
+- **可解释候选发现**：每个 candidate 保留 score、evidence、counterevidence、PathID 与来源哈希。
+- **歌曲与难度索引**：从 Addressables、StageInfo 与 ALBUM 配置恢复稳定 song/chart 关系。
+- **Canonical Chart schema 1.1**：单一 raw-record table，event 仅通过原始 index 引用。
+- **未知信息保真**：未知字段与未知 type 不会被删除或强行映射。
+- **验证与独立审计**：检查来源 SHA、Decimal、事件结构、raw index 闭包与全量文件 manifest。
+- **通用输出接口**：内置 JSON、CSV 与 Python API，不绑定 MusePlay、YOLO 或 AutoPlay。
+- **版本 fail-closed**：未知 fingerprint 默认只能 scan/probe，不会静默套用已知 parser。
+
+## 工作原理
+
+```mermaid
+flowchart LR
+    A["Muse Dash 本地资源"] --> B["Resource Scanner"]
+    B --> C["Unity / Addressables"]
+    C --> D["Chart Discovery"]
+    D --> E["Odin Chart Parser"]
+    E --> F["Song / Difficulty Index"]
+    F --> G["Canonical Chart 1.1"]
+    G --> H["Validation"]
+    H --> I["JSON / CSV / Python API"]
 ```
 
-输出 `diagnostics/field_hypotheses.jsonl`。解析器只接受已由实际字节证明的 Odin tag、类型和字段顺序；未知 tag、截断、计数不符或节点失配会产生带 offset 和字段上下文的错误，不会猜测后继续。
+项目始终遵循：**先证明，再抽象；先解析一张，再解析全部；先保真，再做转换。**
+任何关于磁盘格式的结论都必须指向具体文件、bundle、PathID、对象类型、字段或可复现实验。
 
-Phase 5 的本地实验提取：
+## 支持状态
 
-```powershell
-.\.venv\Scripts\python.exe -m musedash_chart_extractor extract `
-  --game-dir "E:\SteamLibrary\steamapps\common\Muse Dash" `
-  --source "MuseDash_Data/StreamingAssets/aa/StandaloneWindows64/music_urban_magic_assets_all.bundle" `
-  --path-id 8668625138739021960 `
-  --output experimental/first_chart.json
-```
+| 项目 | 当前状态 |
+|---|---|
+| ROADMAP | Phase 0–10 完成，M0–M9 达到 |
+| Canonical schema | `1.1.0` |
+| 正式资源 profiles | 2 个 exact inventory fingerprints |
+| 最新实盘 | 2,331 candidates；2,330 success；1 uncertain；0 failed |
+| 最新全量输出 | 1,204,824 exported events；1,817,952 raw records |
+| 确定性 | 两轮 manifest 逐字节相同，16 类最终审计 mismatch 均为 0 |
+| 语义验证 | M7 partial，不宣称全库逐事件 100% 对照 |
 
-`experimental/first_chart.json` 是本机官方数据、已被 Git 忽略，当前 schema 不稳定且未 canonicalize。它保留完整 StageInfo envelope、原始 Odin 记录、`notedata.json` 中实际使用的配置以及未知字段；逻辑对象按 exact `configData.time`、config ID 和原始 base index 稳定排列，原始 record index 仍作为 provenance 保留。它不能作为稳定导出格式，也不得提交仓库。无媒体内容的 M4 验证摘要位于 `diagnostics/first_chart_validation.json`。
+正式支持按完整安装 fingerprint 判定，而不是按游戏营销版本或 Steam BuildID 猜测：
 
-恢复歌曲、难度和 chart 索引：
+| Fingerprint | StageInfo | 结果 | 发布状态 |
+|---|---:|---|---|
+| `1821d79e…f0ab5` | 2,331 | 2,330 exported + 1 uncertain | `v0.1.0` |
+| `d9108183…33222` | 2,305 | 2,304 exported + 1 uncertain | 当前源码，尚未发布 |
 
-```powershell
-.\.venv\Scripts\python.exe -m musedash_chart_extractor index `
-  --game-dir "E:\SteamLibrary\steamapps\common\Muse Dash" `
-  --output diagnostics/song_chart_index.json
-```
+详细 fingerprint、Addressables build hash 与兼容边界见
+[Supported Resource Versions](docs/supported-versions.md)。
 
-索引器以 Addressables StageInfo primary key 为 `chart_id`、ALBUM `uid` 为 `song_id`、末尾 `_mapN` 为 `difficulty_id`；它会校验唯一 bundle dependency 和 source SHA。无法连接的 chart 保留在 `unresolved_charts`，不会被静默跳过。真实 ALBUM 文件包含注释和尾逗号，因此由 JSON5 parser 读取后再做严格字段验证。
+> [!NOTE]
+> “精确核对”目前表示磁盘来源、文件哈希、结构解析、raw-record accounting 和重复执行
+> 确定性已闭环。独立逐事件参考尚未覆盖全部谱面，因此 timing/type/lane/duration 的全库
+> 比较仍明确为 `not_compared`；`tutorial_v2_map1` 也继续保留为 unresolved/uncertain。
 
-将 Phase 5/6 证据转换为 Canonical Chart：
-
-```powershell
-.\.venv\Scripts\python.exe -m musedash_chart_extractor canonicalize `
-  --raw-chart experimental/first_chart.json `
-  --song-index diagnostics/song_chart_index.json `
-  --validation-report diagnostics/first_chart_validation.json `
-  --output experimental/first_chart_canonical.json `
-  --report diagnostics/canonicalization_report.json
-```
-
-Canonical JSON 仍含本机官方数据并保持 Git ignored。`1.1.0` 使用单一 raw-record table，event 仅通过原始 index 引用，不再重复嵌入完整 record/group；稳定字段、可重建无损规则和 unknown/raw 保真边界见 [docs/schema.md](docs/schema.md)。`canonicalization_report.json` 只保存哈希、计数和无损检查，不保存事件内容。
-
-对一张或多张 Canonical Chart 做结构、来源和独立数量参考验证：
-
-```powershell
-.\.venv\Scripts\python.exe -m musedash_chart_extractor validate `
-  --chart experimental/urban_magic_map1_canonical.json `
-  --chart experimental/urban_magic_map2_canonical.json `
-  --chart experimental/first_chart_canonical.json `
-  --game-dir "E:\SteamLibrary\steamapps\common\Muse Dash" `
-  --reference-file diagnostics/validation_references.json `
-  --output diagnostics/validation_report.json `
-  --markdown-output diagnostics/validation_report.md
-```
-
-验证器严格检查 exact Decimal、事件顺序、duration/end、source SHA-256，以及原始 record index 集合是否被 event 与 sentinel 精确覆盖。当前公开参考只提供最终 combo，因此报告中的 `matched`、`missing_offline`、`extra_offline`、`timing_delta`、`type_mismatch`、`lane_mismatch`、`duration_delta` 七类逐事件差异都明确为 `not_compared`；aggregate 数量一致不会被描述成逐事件一致。
-
-Phase 9 的全量 metadata-only census 已在两个 fingerprint 上完成。最新版本的 733 个 bundle / 2,331 个 StageInfo 和历史 depot 的 725 个 bundle / 2,305 个 StageInfo 均严格解析到 EOF，并通过 `composite-neutral-base-negative-id-singleton-v2` 分组规则。`configData.id < 0` 的记录逐条独立；base 由两个 long-press state flag 均为 false 判定，不再使用已被反例推翻的 `endIndex==0` 假设。
-
-批量导出：
-
-```powershell
-.\.venv\Scripts\python.exe -m musedash_chart_extractor extract-all `
-  --game-dir "E:\SteamLibrary\steamapps\common\Muse Dash" `
-  --output extracted
-```
-
-`extract-all` 会先重新扫描完整安装 fingerprint，再要求 candidates、song index 和 grouping census 精确一致。输出位于 `extracted/charts/<song_id>/<chart_id>.json`，并在最后写 `extracted/manifest.json`。最新 fingerprint 的实盘结果为 2,330 success、1 uncertain、0 failed、1,204,898 logical events；输出及 manifest 均为本机官方衍生数据，已被 Git 忽略，不得再分发。
-
-历史 Canonical schema `1.0.0` 曾完成两轮全库确定性验证。最新 fingerprint
-也已原地完成两次 `1.1.0` 全量运行：2,330 个文件共
-14,086,037,521 bytes，manifest 为 2,606,521 bytes、SHA-256
-`20d1bcd8f9a733614d9e0ab968abe855220c34e7e4bb2d2f390916d3426db4ea`。
-两次 manifest 逐字节相同。第一次独立审计重新读取并哈希全部文件，15 类
-mismatch 均为 0；第二次在此基础上增加 fail-closed manifest 完整性检查，16 类
-missing / extra / size / SHA / schema / layout / group / event-reference /
-raw-accounting / manifest mismatch 仍全部为 0。相比旧树减少 10,651,836,598
-bytes（43.059%）。event 只保留
-原始 record index，不再重复嵌入 record body 或派生 `logical_objects`。
-
-完整本地批量审计：
-
-```powershell
-$env:PYTHONPATH = (Resolve-Path src).Path
-python tools/audit_extracted_batch.py `
-  --output-dir extracted `
-  --report diagnostics/batch_audit.json
-```
-
-审计报告只含 fingerprint、哈希、计数和 mismatch 摘要。不同 fingerprint 的
-完整 JSON 库会分别占用空间；不需要同时保留时，可以在保存 metadata-only
-报告与研究记录后删除旧版本输出。重复验证同一版本应原地重跑，避免双份存储。
-
-## Python API 与 Exporter
+## Python API
 
 ```python
-from musedash_chart_extractor import (
-    CsvExporter,
-    JsonExporter,
-    MuseDashInstallation,
+from musedash_chart_extractor import CsvExporter, JsonExporter, MuseDashInstallation
+
+game = MuseDashInstallation.open(r"D:\SteamLibrary\steamapps\common\Muse Dash")
+charts = game.extract_charts(
+    output_dir="extracted",
+    diagnostics_dir="diagnostics",
 )
 
-game = MuseDashInstallation.open(r"E:\SteamLibrary\steamapps\common\Muse Dash")
-charts = game.extract_charts(output_dir="extracted", diagnostics_dir="diagnostics")
-
-for chart in charts:  # 从本地 JSON 逐张惰性读取
+for chart in charts:
     JsonExporter(indent=None).export(chart, f"exports/{chart['chart_id']}.json")
     CsvExporter().export(chart, f"exports/{chart['chart_id']}.csv")
 ```
 
-`JsonExporter` 保留完整 Canonical Model。`CsvExporter` 是明确的扁平事件视图，使用 exact Decimal 计算毫秒值；它不会修改或替代内部 raw/unknown 数据。未知 fingerprint 的 `open()` 仍可返回安装对象用于判断；正式提取会抛出 `UnknownGameVersionError`。默认只能先用显式的 `scan` / `probe` 研究命令收集证据，不能强套已知 parser。需要继续做候选、结构或完整 batch 研究时必须显式传入 `--allow-unsupported-research`；batch 仍必须通过同 fingerprint 的完整 candidate/index/census 门禁，并在 manifest 中标记 `formal_support=false`。该选项只产生 evidence，不会修改正式支持表。
+`JsonExporter` 保留完整 Canonical Model。`CsvExporter` 是明确的扁平事件视图，
+不会修改或替代内部 raw/unknown 数据。`extract_charts()` 使用已生成的 diagnostics 门禁文件；
+完整顺序见 [CLI Reference](docs/cli-reference.md#完整批量提取流程)。
 
-默认诊断输出位于当前工作目录的 `diagnostics/`。为保证只读边界，任何输出目录或文件都不能位于游戏安装目录内部。
+## 项目文档
 
-## 测试
+| 文档 | 内容 |
+|---|---|
+| [ROADMAP.md](ROADMAP.md) | 主执行规范、Phase 验收门槛与里程碑 |
+| [CLI Reference](docs/cli-reference.md) | 全部命令、输出与本地研究流程 |
+| [Canonical Schema](docs/schema.md) | schema `1.1.0`、raw 引用与保真规则 |
+| [Supported Versions](docs/supported-versions.md) | 正式 fingerprints 与未知版本策略 |
+| [Validation Scope](docs/validation.md) | 结构、aggregate 与逐事件验证边界 |
+| [Architecture](docs/architecture.md) | 模块职责与 Disk-to-Parser 边界 |
+| [Reverse-engineering Notes](docs/reverse-engineering-notes.md) | 真实文件证据、反例与研究记录 |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 开发环境、fixture 与证据要求 |
+| [CHANGELOG.md](CHANGELOG.md) | 版本和未发布变更 |
 
-无需游戏资源的测试：
+## 开发与测试
 
 ```powershell
-pytest -m "not local_game" -q
+python -m pip install -e ".[dev]"
+python -m pytest -m "not local_game" -q
+python -m compileall -q src tests tools
+python -m build
+python tools/audit_release_archives.py dist/*
 ```
 
-真实安装测试只读运行，并通过环境变量显式启用：
+真实安装测试通过 `MUSEDASH_GAME_DIR` 显式启用；CI 不需要也不会获得 Muse Dash 资源。
+贡献前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-```powershell
-$env:MUSEDASH_GAME_DIR = "E:\SteamLibrary\steamapps\common\Muse Dash"
-$env:MUSEDASH_EXTRACTED_DIR = (Resolve-Path extracted).Path
-pytest -m local_game -q
-```
+## 这是不是 Mod 或运行时工具？
 
-这类测试不会要求 CI 拥有 Muse Dash，也不会上传本地资源。
+**不是。**
 
-## 法律与数据边界
+MuseDashChartExtractor 只读取用户指定的本地安装文件。它不会启动 Muse Dash、安装 Mod、
+注入 DLL、扫描内存、调用运行时组件或修改游戏文件。项目也不提供游戏资源下载、DRM 绕过
+或官方内容再分发能力。
 
-本仓库只包含提取器源码、文档和人工构造 fixture。请勿提交完整官方谱面、AssetBundle、歌曲音频、Texture、DLC 内容或可还原这些内容的 dump。用户必须自行拥有并指定本机 Muse Dash 安装。
+---
 
-## License
-
-源码以 [MIT License](LICENSE) 发布。Muse Dash 及其相关名称和资产归各自权利人所有；本项目与游戏开发商或发行商无隶属关系。
+源码以 [MIT License](LICENSE) 发布。Muse Dash 及其相关名称和资产归各自权利人所有；
+本项目与游戏开发商或发行商无隶属关系，也不代表其立场。

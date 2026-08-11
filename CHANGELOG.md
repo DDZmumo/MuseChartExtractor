@@ -8,6 +8,8 @@ separately.
 
 ### Changed
 
+- Rework the README into a release-oriented project overview and move the
+  complete evidence-gated command workflow to `docs/cli-reference.md`.
 - Record the completed `v0.1.0` CI/release evidence and direct GitHub wheel
   installation path in the public documentation.
 - Add formal support evidence for Steam depot manifest `241392741196033182`,
@@ -25,9 +27,9 @@ separately.
 
 ## [0.1.0] - 2026-08-11
 
-First public alpha. Publishing still requires a green CI run for the tagged
-revision and a matching GitHub Release; this heading alone is not publication
-evidence.
+First public alpha, published from tagged revision `9158640` after its test,
+package, and release workflows passed. The matching GitHub Release contains the
+audited wheel and sdist; this heading alone is not publication evidence.
 
 ### Added
 
