@@ -194,9 +194,9 @@ Phase 10  Public API / Exporter / Open-source Hardening
 
 当前 exact fingerprint
 `sha256:1821d79ef6d53bca76c60491a2395496054fa473c31482ecc73b8d866c5f0ab5`
-已依次通过 Phase 0–10 的本地技术验收门槛，M0–M8 已达到，`0.1.0` 正进入
-M9 发布流程。M9 是否达到必须由远端受版本控制 revision 的真实 CI、tag 和
-GitHub Release 共同证明，不能把本地构建成功等同于已经发布。这个边界也不表示其他游戏
+已依次通过 Phase 0–10，M0–M9 已达到。`v0.1.0` 对应 revision `9158640`；
+main push 与 tag 的两次真实 GitHub Actions 均通过完整测试/package 门禁，tag
+workflow 随后创建了包含已审计 wheel/sdist 的公共 GitHub Release。这个边界不表示其他游戏
 fingerprint 自动兼容，不把 M7 的 aggregate 验证夸大为全库逐事件 100% 准确。
 
 ---
@@ -1400,10 +1400,9 @@ CLI 只是 API 的薄封装。
 - 无游戏资源测试、真实 `local_game` 测试、sdist/wheel 构建及内容审计通过；
 - 发布包不包含 diagnostics、experimental、extracted、exports 或官方资源数据。
 
-当前实现满足以上本地技术条件，Canonical Chart schema 为 `1.1.0`，Python
-package release candidate 版本为 `0.1.0`。公共目标仓库为
-`https://github.com/DDZmumo/MuseChartExtractor`；只有该仓库中对应 revision 的
-真实 CI、`v0.1.0` tag 和 Release 均存在时，才能把 M9 标记为达到。
+当前实现满足以上条件，Canonical Chart schema 为 `1.1.0`，Python package
+版本为 `0.1.0`。公共仓库、真实 CI、`v0.1.0` tag 和 Release 均已建立，
+**M9 达到**。项目没有宣称已上传 PyPI；当前公共制品由 GitHub Release 提供。
 
 ---
 
@@ -1705,18 +1704,14 @@ CLI 和 scanner 可运行。
 
 文档、测试、许可证、API、兼容策略完成。
 
-当前状态：本地技术内容和目标项目 URL 已完成；正在等待受版本控制 revision
-的真实 CI，以及 `v0.1.0` tag/Release。不得把本地构建称为公开发布。
+当前状态：技术内容、受版本控制 revision、公共项目 URL、真实 CI、
+`v0.1.0` tag 和 GitHub Release 均完成，M9 达到。
 
 ---
 
 # 11. 当前最优先任务
 
-M9 前的剩余工作是把完整工作树纳入首次 revision，推送到已确认的项目 URL，
-在该 revision 上通过 CI，然后创建 `v0.1.0` tag/Release。CI workflow 会保留
-并发布同一次构建中已经过审计的 wheel/sdist，避免发布时重新构建不同字节。
-
-M9 后的首要研究工作不是增加 GUI 或下游适配器，而是获取第二个真实游戏
+M9 已完成。当前首要研究工作不是增加 GUI 或下游适配器，而是获取第二个真实游戏
 fingerprint，重复 Phase 1–9 的证据链，验证兼容层是否需要分叉，并扩大独立
 逐事件参考覆盖。未知版本继续保持 probe-only，不能通过降低门禁换取表面兼容。
 
@@ -1746,8 +1741,8 @@ fingerprint，重复 Phase 1–9 的证据链，验证兼容层是否需要分�
 - [x] 仓库不包含官方完整资源或完整谱面 dump
 - [x] 下游项目可以通过通用 API / Exporter 使用结果
 - [x] 核心代码不绑定 MusePlay、YOLO 或 AutoPlay
-- [ ] 首次受版本控制的 revision 已通过真实 CI
-- [ ] 公共仓库 URL、`0.1.0` changelog、tag/release 已建立
+- [x] 首次受版本控制的 revision 已通过真实 CI
+- [x] 公共仓库 URL、`0.1.0` changelog、tag/release 已建立
 
 ---
 

@@ -4,7 +4,7 @@ MuseDashChartExtractor 是一个纯 Python、只读、离线的 Muse Dash 官方
 
 项目目标是从用户自行拥有的 Windows 版 Muse Dash 本地安装资源中，定位、解析、验证并导出官方谱面数据。它不会启动游戏、安装 Mod、注入 DLL、读取运行时内存或修改游戏文件，也不提供任何官方资源下载或再分发。
 
-> 当前状态：Phase 0–10 的本地技术验收已在一个 exact 本机资源 fingerprint 上完成，M0–M8 有可复现实证，`0.1.0` 正在进入 M9 发布流程。是否已经公开发布必须以 GitHub 上对应 revision 的绿色 CI、`v0.1.0` tag 和 Release 为准，不能由源码树中的版本号自行宣告。2,331 张 StageInfo 谱面全部可严格离线解析和分组；2,330 张已恢复 song/chart 身份并导出，`tutorial_v2_map1` 明确保留为 unresolved/uncertain。历史 schema `1.0.0` 的两轮完整批量运行得到字节相同的 manifest；当前 Canonical Chart schema `1.1.0` 已完成一次全量刷新和独立逐文件审计。M7 仍只是三张 Urban Magic 谱的 source、结构、raw accounting 与 aggregate combo 部分验证，不是全库逐事件 100% 精确声明。正式支持仅限 [supported-versions.md](docs/supported-versions.md) 列出的完整 fingerprint。
+> 当前状态：Phase 0–10 和 M0–M9 已在一个 exact 本机资源 fingerprint 上达到。首个公共版本 [v0.1.0](https://github.com/DDZmumo/MuseChartExtractor/releases/tag/v0.1.0) 对应 revision `9158640`，其 Windows/Linux、Python 3.10–3.13 测试、package 和 release jobs 均由 GitHub Actions 真实通过。2,331 张 StageInfo 谱面全部可严格离线解析和分组；2,330 张已恢复 song/chart 身份并导出，`tutorial_v2_map1` 明确保留为 unresolved/uncertain。历史 schema `1.0.0` 的两轮完整批量运行得到字节相同的 manifest；当前 Canonical Chart schema `1.1.0` 已完成一次全量刷新和独立逐文件审计。M7 仍只是三张 Urban Magic 谱的 source、结构、raw accounting 与 aggregate combo 部分验证，不是全库逐事件 100% 精确声明。正式支持仅限 [supported-versions.md](docs/supported-versions.md) 列出的完整 fingerprint。
 
 ## 开发路线
 
@@ -29,6 +29,12 @@ python -m pip install -e ".[dev]"
 python -m build
 python -m pip install dist\musedash_chart_extractor-0.1.0-py3-none-any.whl
 musedash-chart-extractor --help
+```
+
+首个 GitHub Release wheel 可直接安装；项目当前未声明已发布到 PyPI：
+
+```powershell
+python -m pip install "https://github.com/DDZmumo/MuseChartExtractor/releases/download/v0.1.0/musedash_chart_extractor-0.1.0-py3-none-any.whl"
 ```
 
 ## 使用

@@ -6,7 +6,10 @@ separately.
 
 ## [Unreleased]
 
-No unreleased changes.
+### Changed
+
+- Record the completed `v0.1.0` CI/release evidence and direct GitHub wheel
+  installation path in the public documentation.
 
 ## [0.1.0] - 2026-08-11
 

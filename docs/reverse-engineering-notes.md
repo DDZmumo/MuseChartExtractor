@@ -1011,3 +1011,27 @@ both opt-in `local_game` checks against the 2,330-file schema `1.1.0` output.
 and isolated wheel/sdist installs also passed. The installed wheel metadata
 reported version `0.1.0` and the confirmed GitHub project URLs; both installed
 CLI copies exposed the explicit unsupported-version research option.
+
+### Public release evidence
+
+The initial revision is
+`91586403d07cfe95ccb325e5e9a9bc4a6fa9dcb0`. The `main` push workflow
+`31459950516` completed successfully: all eight Windows/Linux and Python
+3.10–3.13 test jobs passed, followed by the package job. Annotated tag
+`v0.1.0` points to the same revision. Its independent workflow
+`31460090699` again passed all eight tests, package, and release jobs.
+
+GitHub Release `v0.1.0` was published at
+`https://github.com/DDZmumo/MuseChartExtractor/releases/tag/v0.1.0` with the
+exact artifacts from the successful tag workflow:
+
+| artifact | bytes | GitHub/API SHA-256 |
+|---|---:|---|
+| `musedash_chart_extractor-0.1.0-py3-none-any.whl` | 91,205 | `b7b0c556c40a0cb68971a0c570e62be51727a9dab3b4cf9b0da288d63ef60cf8` |
+| `musedash_chart_extractor-0.1.0.tar.gz` | 156,426 | `e51cacfbb84d948bb8bc8bb393201534df046715b750d46e95a260f39c3e4b3f` |
+
+Both public files were downloaded again. Their local hashes matched the API
+digests; `twine check`, the allowlisted member/type/license/name/version audit,
+isolated installation, CLI version, and research-gate help smoke tests all
+passed. This is external evidence for **M9 achieved**, not an inference from a
+local build. No PyPI publication is claimed.
