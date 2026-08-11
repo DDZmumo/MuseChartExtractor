@@ -235,6 +235,7 @@ class BatchExtractionTests(unittest.TestCase):
                 expected_candidate_count=2,
                 loader=loader,
                 extractor_version="test-version",
+                research_mode=True,
             )
             first_manifest = (output / "manifest.json").read_bytes()
             first_chart = output / "charts" / "fixture-song" / "fixture_map1.json"
@@ -251,6 +252,7 @@ class BatchExtractionTests(unittest.TestCase):
                 expected_candidate_count=2,
                 loader=loader,
                 extractor_version="test-version",
+                research_mode=True,
             )
 
             self.assertEqual(len(load_calls), 2, "one source load is allowed per invocation")
@@ -259,6 +261,11 @@ class BatchExtractionTests(unittest.TestCase):
             self.assertEqual(first, second)
             self.assertEqual(first["status_counts"], {"success": 1, "uncertain": 1})
             self.assertEqual(first["milestone_status"], "M8-achieved")
+            self.assertEqual(
+                first["profile_support"]["status"],
+                "unsupported-fingerprint-research",
+            )
+            self.assertFalse(first["profile_support"]["formal_support"])
             self.assertTrue(first["complete"])
             self.assertEqual(
                 [row["chart_id"] for row in first["charts"]],
@@ -450,6 +457,17 @@ class BatchExtractionTests(unittest.TestCase):
                     grouping_census_summary={},
                     note_configs_by_uid={},
                     note_data_provenance={},
+                )
+            with self.assertRaisesRegex(BatchExtractionError, "research_mode"):
+                extract_all_charts(
+                    game,
+                    Path(temporary) / "research-output",
+                    [{}],
+                    {},
+                    grouping_census_summary={},
+                    note_configs_by_uid={},
+                    note_data_provenance={},
+                    research_mode=1,  # type: ignore[arg-type]
                 )
 
     def test_census_and_index_must_cover_the_exact_candidate_set(self) -> None:

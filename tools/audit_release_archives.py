@@ -47,6 +47,10 @@ SDIST_EGG_INFO_FILES = {
     "requires.txt",
     "top_level.txt",
 }
+SDIST_TOOL_FILES = {
+    "audit_extracted_batch.py",
+    "audit_release_archives.py",
+}
 WHEEL_DIST_INFO_FILES = {
     "METADATA",
     "RECORD",
@@ -203,7 +207,11 @@ def _sdist_file_allowed(name: str, *, version: str) -> bool:
         return relative[1] == "conftest.py" or (
             relative[1].startswith("test_") and relative[1].endswith(".py")
         )
-    return relative == ("tools", "audit_release_archives.py")
+    return (
+        len(relative) == 2
+        and relative[0] == "tools"
+        and relative[1] in SDIST_TOOL_FILES
+    )
 
 
 def _read_archive_file(path: Path, *, kind: str, name: str) -> bytes:
@@ -327,6 +335,7 @@ def audit_archive(path: str | Path) -> dict[str, Any]:
             "README.md",
             "pyproject.toml",
             "tests/test_scanner.py",
+            "tools/audit_extracted_batch.py",
             "tools/audit_release_archives.py",
         ):
             _require_member(file_names, required, archive=archive_path)

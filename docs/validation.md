@@ -30,6 +30,17 @@ Until an event-level independent reference is explicitly supplied, every categor
 `not_compared`. The production extractor does not depend on a runtime export, Mod,
 injection, or game process.
 
+For a complete schema `1.1.0` batch, `tools/audit_extracted_batch.py`
+independently reopens every successful file. It checks the manifest path,
+size, and SHA-256; the single raw-table layout; raw index uniqueness; gameplay
+and sentinel groups; event/base references; and exact set equality between all
+event/sentinel references and the retained raw table. It also recomputes the
+Phase/M8 state, row counts, status aggregates, phase gate, source count, event
+count, and unique chart IDs instead of trusting the manifest header. This proves
+structural closure and deterministic storage, not gameplay semantics. The
+report is metadata-only and can be kept after deleting local official-derived
+outputs.
+
 Finite negative `configData.time` values are legal raw evidence. They occur in the
 current installation (observed `-0.482` and `-0.232` pre-roll values) and are retained
 with `negative_raw_time_preserved`; no offset is invented to force them to zero.

@@ -4,7 +4,7 @@ MuseDashChartExtractor 是一个纯 Python、只读、离线的 Muse Dash 官方
 
 项目目标是从用户自行拥有的 Windows 版 Muse Dash 本地安装资源中，定位、解析、验证并导出官方谱面数据。它不会启动游戏、安装 Mod、注入 DLL、读取运行时内存或修改游戏文件，也不提供任何官方资源下载或再分发。
 
-> 当前状态：Phase 0–10 和 M0–M9 已在一个 exact 本机资源 fingerprint 上达到。首个公共版本 [v0.1.0](https://github.com/DDZmumo/MuseChartExtractor/releases/tag/v0.1.0) 对应 revision `9158640`，其 Windows/Linux、Python 3.10–3.13 测试、package 和 release jobs 均由 GitHub Actions 真实通过。2,331 张 StageInfo 谱面全部可严格离线解析和分组；2,330 张已恢复 song/chart 身份并导出，`tutorial_v2_map1` 明确保留为 unresolved/uncertain。历史 schema `1.0.0` 的两轮完整批量运行得到字节相同的 manifest；当前 Canonical Chart schema `1.1.0` 已完成一次全量刷新和独立逐文件审计。M7 仍只是三张 Urban Magic 谱的 source、结构、raw accounting 与 aggregate combo 部分验证，不是全库逐事件 100% 精确声明。正式支持仅限 [supported-versions.md](docs/supported-versions.md) 列出的完整 fingerprint。
+> 当前状态：Phase 0–10 和 M0–M9 已达到。首个公共版本 [v0.1.0](https://github.com/DDZmumo/MuseChartExtractor/releases/tag/v0.1.0) 对应 revision `9158640`，其 Windows/Linux、Python 3.10–3.13 测试、package 和 release jobs 均由 GitHub Actions 真实通过。当前源码已分别完成两个 exact 资源 fingerprint 的 Phase 1–9 证据链；`v0.1.0` 发布物只包含第一个 profile，第二个 profile 尚未发布。最新 fingerprint 的 2,331 张 StageInfo 谱面全部可严格离线解析和分组；2,330 张已恢复 song/chart 身份并导出，`tutorial_v2_map1` 明确保留为 unresolved/uncertain。Canonical Chart schema `1.1.0` 使用单一 raw table 和 index-only event 引用，并由完整批量双跑及逐文件 raw-accounting 审计验证。M7 仍只是三张 Urban Magic 谱的 source、结构、raw accounting 与 aggregate combo 部分验证，不是全库逐事件 100% 精确声明。正式支持仅限 [supported-versions.md](docs/supported-versions.md) 列出的完整 fingerprint。
 
 ## 开发路线
 
@@ -149,7 +149,7 @@ Canonical JSON 仍含本机官方数据并保持 Git ignored。`1.1.0` 使用单
 
 验证器严格检查 exact Decimal、事件顺序、duration/end、source SHA-256，以及原始 record index 集合是否被 event 与 sentinel 精确覆盖。当前公开参考只提供最终 combo，因此报告中的 `matched`、`missing_offline`、`extra_offline`、`timing_delta`、`type_mismatch`、`lane_mismatch`、`duration_delta` 七类逐事件差异都明确为 `not_compared`；aggregate 数量一致不会被描述成逐事件一致。
 
-Phase 9 的全量 metadata-only census 已完成：733 个 bundle 中的 2,331 个 StageInfo 均严格解析到 EOF，并通过 `composite-neutral-base-negative-id-singleton-v2` 分组规则。`configData.id < 0` 的记录逐条独立；base 由两个 long-press state flag 均为 false 判定，不再使用已被反例推翻的 `endIndex==0` 假设。
+Phase 9 的全量 metadata-only census 已在两个 fingerprint 上完成。最新版本的 733 个 bundle / 2,331 个 StageInfo 和历史 depot 的 725 个 bundle / 2,305 个 StageInfo 均严格解析到 EOF，并通过 `composite-neutral-base-negative-id-singleton-v2` 分组规则。`configData.id < 0` 的记录逐条独立；base 由两个 long-press state flag 均为 false 判定，不再使用已被反例推翻的 `endIndex==0` 假设。
 
 批量导出：
 
@@ -159,16 +159,31 @@ Phase 9 的全量 metadata-only census 已完成：733 个 bundle 中的 2,331 �
   --output extracted
 ```
 
-`extract-all` 会先重新扫描完整安装 fingerprint，再要求 candidates、song index 和 grouping census 精确一致。输出位于 `extracted/charts/<song_id>/<chart_id>.json`，并在最后写 `extracted/manifest.json`。当前支持 fingerprint 的实盘结果为 2,330 success、1 uncertain、0 failed、1,204,898 logical events；输出及 manifest 均为本机官方衍生数据，已被 Git 忽略，不得再分发。
+`extract-all` 会先重新扫描完整安装 fingerprint，再要求 candidates、song index 和 grouping census 精确一致。输出位于 `extracted/charts/<song_id>/<chart_id>.json`，并在最后写 `extracted/manifest.json`。最新 fingerprint 的实盘结果为 2,330 success、1 uncertain、0 failed、1,204,898 logical events；输出及 manifest 均为本机官方衍生数据，已被 Git 忽略，不得再分发。
 
-历史 Canonical schema `1.0.0` 曾完成两轮全库确定性验证。当前 release
-candidate 已原地完成一次 `1.1.0` 全量刷新：2,330 个文件共
+历史 Canonical schema `1.0.0` 曾完成两轮全库确定性验证。最新 fingerprint
+也已原地完成两次 `1.1.0` 全量运行：2,330 个文件共
 14,086,037,521 bytes，manifest 为 2,606,521 bytes、SHA-256
 `20d1bcd8f9a733614d9e0ab968abe855220c34e7e4bb2d2f390916d3426db4ea`。
-独立审计重新读取并哈希全部文件，missing / extra / size / SHA / schema /
-layout / event-reference mismatch 均为 0。相比旧树减少 10,651,836,598 bytes
-（43.059%）。当前 `1.1.0` 全库只运行一次；不把历史 `1.0.0` 的双跑 hash
-冒充为新布局的双跑证据。
+两次 manifest 逐字节相同。第一次独立审计重新读取并哈希全部文件，15 类
+mismatch 均为 0；第二次在此基础上增加 fail-closed manifest 完整性检查，16 类
+missing / extra / size / SHA / schema / layout / group / event-reference /
+raw-accounting / manifest mismatch 仍全部为 0。相比旧树减少 10,651,836,598
+bytes（43.059%）。event 只保留
+原始 record index，不再重复嵌入 record body 或派生 `logical_objects`。
+
+完整本地批量审计：
+
+```powershell
+$env:PYTHONPATH = (Resolve-Path src).Path
+python tools/audit_extracted_batch.py `
+  --output-dir extracted `
+  --report diagnostics/batch_audit.json
+```
+
+审计报告只含 fingerprint、哈希、计数和 mismatch 摘要。不同 fingerprint 的
+完整 JSON 库会分别占用空间；不需要同时保留时，可以在保存 metadata-only
+报告与研究记录后删除旧版本输出。重复验证同一版本应原地重跑，避免双份存储。
 
 ## Python API 与 Exporter
 
@@ -187,7 +202,7 @@ for chart in charts:  # 从本地 JSON 逐张惰性读取
     CsvExporter().export(chart, f"exports/{chart['chart_id']}.csv")
 ```
 
-`JsonExporter` 保留完整 Canonical Model。`CsvExporter` 是明确的扁平事件视图，使用 exact Decimal 计算毫秒值；它不会修改或替代内部 raw/unknown 数据。未知 fingerprint 的 `open()` 仍可返回安装对象用于判断；正式提取会抛出 `UnknownGameVersionError`。默认只能先用显式的 `scan` / `probe` 研究命令收集证据，不能强套已知 parser。需要继续做候选或结构研究时必须显式传入 `--allow-unsupported-research`；这只产生 diagnostic evidence，不会把该版本注册为正式支持。
+`JsonExporter` 保留完整 Canonical Model。`CsvExporter` 是明确的扁平事件视图，使用 exact Decimal 计算毫秒值；它不会修改或替代内部 raw/unknown 数据。未知 fingerprint 的 `open()` 仍可返回安装对象用于判断；正式提取会抛出 `UnknownGameVersionError`。默认只能先用显式的 `scan` / `probe` 研究命令收集证据，不能强套已知 parser。需要继续做候选、结构或完整 batch 研究时必须显式传入 `--allow-unsupported-research`；batch 仍必须通过同 fingerprint 的完整 candidate/index/census 门禁，并在 manifest 中标记 `formal_support=false`。该选项只产生 evidence，不会修改正式支持表。
 
 默认诊断输出位于当前工作目录的 `diagnostics/`。为保证只读边界，任何输出目录或文件都不能位于游戏安装目录内部。
 

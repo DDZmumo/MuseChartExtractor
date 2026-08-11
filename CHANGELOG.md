@@ -10,6 +10,18 @@ separately.
 
 - Record the completed `v0.1.0` CI/release evidence and direct GitHub wheel
   installation path in the public documentation.
+- Add formal support evidence for Steam depot manifest `241392741196033182`,
+  keyed by its complete `d9108183...33222` inventory fingerprint.
+- Permit explicit nonformal `extract-all` research runs for unknown
+  fingerprints only after the full candidate/index/grouping-census gates pass;
+  their manifests cannot claim formal support.
+- Add a full-batch schema `1.1.0` auditor that verifies every file hash and the
+  exact raw-record/event/sentinel index closure, recomputes fail-closed manifest
+  integrity, and reports malformed UTF-8 as structured audit failures.
+- Re-run the latest fingerprint's full schema `1.1.0` batch in place and verify
+  a byte-identical manifest without retaining a duplicate chart tree.
+- Compile and smoke-test packaged tools in CI, and reject release tags that do
+  not match the package version.
 
 ## [0.1.0] - 2026-08-11
 

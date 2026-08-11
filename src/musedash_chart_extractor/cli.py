@@ -300,6 +300,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=50,
         help="emit progress after this many bundles (default: 50; 0 disables)",
     )
+    _add_unsupported_research_override(extract_all)
     return parser
 
 
@@ -958,8 +959,13 @@ def _run_extract_all(
         bundle_inventory_file=arguments.bundle_inventory,
         grouping_census_summary_file=arguments.grouping_census_summary,
         progress=progress,
+        allow_unsupported_research=arguments.allow_unsupported_research,
     )
     manifest = collection.manifest
+    support = manifest.get("profile_support")
+    formal_support = not (
+        isinstance(support, dict) and support.get("formal_support") is False
+    )
     print(
         json.dumps(
             {
@@ -972,6 +978,7 @@ def _run_extract_all(
                 "status_counts": manifest["status_counts"],
                 "raw_parse_status_counts": manifest["raw_parse_status_counts"],
                 "canonical_status_counts": manifest["canonical_status_counts"],
+                "formal_support": formal_support,
                 "batch_manifest": str((output_dir / "manifest.json").resolve()),
             },
             ensure_ascii=False,

@@ -992,8 +992,9 @@ revision was created:
    `grouping-census` could enter parser code on an unknown fingerprint even
    though formal batch extraction was gated. They now require the supported
    profile by default. `--allow-unsupported-research` is an explicit,
-   diagnostic-only escape hatch for evidence collection; `extract-all`
-   remains unavailable until a profile is registered.
+   diagnostic-only escape hatch for evidence collection. At the `v0.1.0`
+   boundary, `extract-all` remained unavailable until profile registration;
+   the later fail-closed research batch path is documented below.
 3. The release archive checker used a suffix blacklist. It now uses separate
    wheel/sdist path allowlists, rejects links and special members, requires the
    license, and checks the distribution name/version in both metadata files.
@@ -1035,3 +1036,167 @@ digests; `twine check`, the allowlisted member/type/license/name/version audit,
 isolated installation, CLI version, and research-gate help smoke tests all
 passed. This is external evidence for **M9 achieved**, not an inference from a
 local build. No PyPI publication is claimed.
+
+## 2026-08-11 — Second exact fingerprint, Phase 1–9 compatibility closure
+
+### Acquisition and fingerprint boundary
+
+Steam depot manifest `241392741196033182` for app `774171` / depot `774172`
+was downloaded to Steam's separate content directory. Muse Dash was not
+launched, the current installation was not overwritten, and no runtime memory,
+mod, injection, or game-file mutation was used. Two complete scans were
+byte-identical:
+
+```text
+inventory fingerprint:
+sha256:d9108183177ac7c4821b466d28e0920d8a4a9bcd490a0edde956be3681233222
+files:                 5,193
+total bytes:           4,763,359,044
+UnityFS:               5,069
+resource inventory:    c04a389193d5db580608069c19216e555846a0fcddee66371acd2afa006927b4
+resource summary:      f88abf76ce24fb086229e46c3a4b203ab35181d8725af3aa05a63be2f9156d50
+```
+
+The Addressables version remains `1.21.20`; the build-result hash is
+`f4759f2e039525793e62c59c15df44c6`. A full Phase 2 probe opened all
+5,072 sources with zero failures or warnings. The compact catalog contained
+33,866 entries and 50,164 keys, and its 5,069 bundle IDs matched the inventory
+5,069/5,069.
+
+### Cross-build evidence and counterevidence
+
+Compared with the newer `1821...f0ab5` fingerprint, this depot has 26 fewer
+StageInfo charts in eight music sources. All 725 shared StageInfo sources are
+byte-identical; none merely look structurally similar. The standalone
+`notedata.json` bundle and global NoteDataManager bundle are also byte-identical
+with SHA-256 values `28e322b8...4e91` and `a28ca81b...9598` respectively.
+
+This is not evidence that the executables are identical. `GameAssembly.dll`,
+`global-metadata.dat`, catalog, settings, and 47 logical config resources
+changed. The second metadata still contains exact NUL-delimited Sirenix,
+Odin, MusicData, MusicConfigData, NoteConfigData, grouping-field, and combo
+identifiers, but their offsets moved. No first-build static address or method
+offset is reused. The support decision is limited to the disk parser and
+grouping family proven below.
+
+### Phase gates
+
+The second fingerprint independently passed the ordered gates:
+
+```text
+M1:  two stable full inventories
+M2:  5,072 / 5,072 Unity sources parseable
+M3:  2,305 scored StageInfo candidates in 725 sources
+M4:  urban_magic_map3 strict EOF parse and byte-identity validation
+M5:  2,304 indexed charts, 1 explicit unresolved chart
+M6:  schema 1.1.0 lossless reconstruction checks all true
+M7:  three Urban Magic charts passed source/structure/aggregate references
+M8:  all 2,305 candidates classified by complete batch extraction
+```
+
+The selected M4 object is `urban_magic_map3`, PathID
+`8668625138739021960`, in bundle SHA-256
+`027bcaa714e3d04b42f0c6752046d6e71b37d8c400d439840a75033368357594`.
+Its 481,388-byte Odin payload SHA-256 is
+`e311b3f4c640428bd31596d5d1b2c7851bcf25618f4c9aa51176f1e24b698a18`.
+Bundle, PathID, payload, and note configuration are byte-identical to the
+previously video-validated object, so the earlier selected-frame evidence
+applies to this exact disk chart. This transfer does not validate all changed
+executable methods or every chart in the depot.
+
+The complete grouping census has SHA-256
+`17ebc944c12dd3272f84a31ab3c84ac27fef75a0fed5a10631c6237806e1c732`
+for its summary and
+`236b2d5ad6d171e7bbb679e19f444e0001a3ec4e65efa039e3fdd5b05137235e`
+for its 2,305-row JSONL:
+
+```text
+strict raw parse:          2,305 / 2,305
+grouping:                  2,305 / 2,305
+raw records:               1,791,972
+logical objects:           1,190,657
+charts with sentinel:      987
+negative config-id rows:   7,707
+nonzero neutral endIndex:  60,146
+```
+
+### Schema 1.1 batch determinism
+
+An explicit research-only batch path was added to break the evidence-gate
+cycle without weakening the formal default. Unknown fingerprints still fail
+formal extraction. `--allow-unsupported-research` requires the exact candidate,
+song-index, source, and complete census fingerprint gates, and its manifest
+states `profile_support.formal_support=false`. It cannot edit the support
+registry.
+
+Two complete runs overwrote the same output tree and produced the same bytes:
+
+```text
+candidates:                         2,305
+success / uncertain / failed:       2,304 / 1 / 0
+manifest logical events:            1,190,657
+exported events:                    1,190,583
+exported raw records:               1,791,769
+chart files:                        2,304
+chart bytes:                        13,884,429,834
+tree bytes including manifest:      13,887,006,934
+manifest bytes:                     2,577,100
+manifest SHA-256:                   d893ca25bbb86683d3b27cdf016c594afc3406be9fd1432e5b2398298a0d94d2
+```
+
+The 74 logical objects and 203 raw records not present in exported files belong
+to `tutorial_v2_map1`, which remains explicitly `uncertain` because its song
+identity is unresolved. It is present in the manifest and census, not silently
+discarded.
+
+The strengthened auditor independently reopened and hashed all 2,304 files,
+then checked the schema `1.1.0` raw layout, unique raw indices, gameplay and
+sentinel groups, event/base references, and exact event-plus-sentinel set
+closure. Both 1,961-byte audit reports were byte-identical with SHA-256
+`319be38df3fc1079dd3638f4036e99ac83f9619c37caff0bb2ebe7cbe07d2713`.
+All 15 mismatch categories were zero. This proves storage closure and
+determinism; it does not promote M7 to full event-level semantic validation.
+
+After this evidence closed, the exact fingerprint was registered with the same
+observed Odin parser and grouping rule. The local old depot, its 12.933 GiB
+canonical output, 0.074 GiB experimental files, and two interrupted partial
+trees were removed to conserve disk space. The metadata-only diagnostics and
+this record remain; no official chart or bundle is committed.
+
+## 2026-08-11 — Latest schema 1.1 second-run closure
+
+The current supported fingerprint
+`sha256:1821d79ef6d53bca76c60491a2395496054fa473c31482ecc73b8d866c5f0ab5`
+was extracted a second time in place, overwriting the existing chart tree rather
+than retaining another 14 GB copy. The run completed in 2,297.1 seconds:
+
+```text
+candidates:                    2,331
+sources:                       733
+raw parsed:                    2,331 / 2,331
+success / uncertain / failed: 2,330 / 1 / 0
+manifest logical events:      1,204,898
+canonical schema:             1.1.0
+```
+
+The second manifest is byte-identical to the manifest retained from the first
+schema `1.1.0` run: 2,606,521 bytes, SHA-256
+`20d1bcd8f9a733614d9e0ab968abe855220c34e7e4bb2d2f390916d3426db4ea`.
+Because the manifest contains every output path, byte count, SHA-256, event
+count, raw-record count, source identity, and status, this establishes exact
+batch determinism without storing both output trees.
+
+The second tree was then independently reopened with the strengthened auditor.
+It covered 2,330 files / 14,086,037,521 bytes, 1,204,824 exported gameplay
+events, and 1,817,952 exported raw records. All 16 mismatch categories were
+zero, including the new fail-closed manifest-integrity category. The metadata-
+only report is 1,830 bytes with SHA-256
+`eb1987123b929ae807fb7503fc0554d70399b7c89247230d8e28f00ee9805d58`.
+The first run's retained audit used the earlier 15-category tool; the reports
+are therefore not described as byte-identical even though both passed and the
+two independently generated manifests are byte-identical.
+
+This is exact storage, identity, and structural-accounting evidence. It does
+not change M7's partial status: full event-level timing/type/lane/duration truth
+is still `not_compared`, `is_air` is not canonicalized, and
+`tutorial_v2_map1` remains explicitly unresolved/uncertain.

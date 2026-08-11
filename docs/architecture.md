@@ -30,8 +30,11 @@ IDs must exactly equal indexed IDs plus explicitly unresolved IDs.
 The formal parser is selected by the complete installation fingerprint. An
 unknown fingerprint may be scanned and probed by default. Deeper candidate or
 structure research requires the explicit `--allow-unsupported-research` CLI
-opt-in, remains diagnostic-only, and cannot register or use the formal known
-profile until its structure is independently reviewed.
+opt-in and remains nonformal. A research-only batch is permitted only after
+the candidate, index, source fingerprint, and complete grouping-census gates
+all agree; its manifest is marked `formal_support=false`. No research command
+can mutate the profile registry. Registration is a reviewed source change made
+only after full extraction and independent audit evidence exists.
 
 ## Data ownership
 
@@ -51,6 +54,8 @@ package, sdist, and wheel contain only source, docs, and synthetic fixtures.
   table. Events retain only raw indices; derived Phase 5 `logical_objects` are
   omitted only after exact reconstruction equality succeeds.
 - `batch.py`: one-load-per-bundle orchestration and deterministic manifest.
+- `batch_audit.py`: independent file/hash/schema/index-closure audit for a
+  completed local batch.
 - `installation.py`: supported-version gate and public Python facade.
 - `exporters/`: neutral destination protocols and JSON/CSV views.
 

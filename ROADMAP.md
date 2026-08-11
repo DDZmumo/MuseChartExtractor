@@ -192,12 +192,14 @@ Phase 10  Public API / Exporter / Open-source Hardening
 
 一个阶段没有通过验收门槛，不进入下一阶段。
 
-当前 exact fingerprint
+当前源码已在两个 exact fingerprint 上完成 Phase 1–9：
 `sha256:1821d79ef6d53bca76c60491a2395496054fa473c31482ecc73b8d866c5f0ab5`
-已依次通过 Phase 0–10，M0–M9 已达到。`v0.1.0` 对应 revision `9158640`；
+和 `sha256:d9108183177ac7c4821b466d28e0920d8a4a9bcd490a0edde956be3681233222`。
+第一个 fingerprint 还已通过 Phase 0–10，M0–M9 已达到。`v0.1.0` 对应 revision `9158640`；
 main push 与 tag 的两次真实 GitHub Actions 均通过完整测试/package 门禁，tag
-workflow 随后创建了包含已审计 wheel/sdist 的公共 GitHub Release。这个边界不表示其他游戏
-fingerprint 自动兼容，不把 M7 的 aggregate 验证夸大为全库逐事件 100% 准确。
+workflow 随后创建了包含已审计 wheel/sdist 的公共 GitHub Release。该发布物只含第一个
+profile；第二个 profile 是当前源码的 Unreleased 变更。这个边界不表示其他游戏 fingerprint
+自动兼容，不把 M7 的 aggregate 验证夸大为全库逐事件 100% 准确。
 
 ---
 
@@ -1283,13 +1285,31 @@ schema `1.0.0` 运行的 manifest 均为 2,607,371 bytes，SHA-256 均为
 `2d989e36722966d1e04698dfe0d94c253b097a932435ed3adcc3bdcb9bf2425a`；
 2,330 个 chart 文件集合、大小与逐文件 SHA 均精确匹配 manifest。
 
-发布前的 schema `1.1.0` 单一 raw-record table 已另做一次全库刷新：manifest
+发布前的 schema `1.1.0` 单一 raw-record table 首次全库刷新得到：manifest
 为 2,606,521 bytes、SHA-256
 `20d1bcd8f9a733614d9e0ab968abe855220c34e7e4bb2d2f390916d3426db4ea`；
 chart 总字节从 24,737,874,119 降至 14,086,037,521（减少 43.059%）。
 独立逐文件审计的 missing、extra、size、SHA、schema、layout 和 event-reference
-mismatch 全为 0。新布局当前只有一次全库运行，确定性另由合成双跑测试覆盖；
-不将旧 schema 的双跑 hash 冒充为新 schema 证据。**M8 仍达到。**
+mismatch 全为 0。当时仍明确区分旧 schema 双跑与新 schema 单跑；下面记录的后续
+实盘双跑才补齐 schema `1.1.0` 的确定性证据。**M8 持续达到。**
+
+2026-08-11 又对 Steam depot manifest `241392741196033182` 的独立完整资源集
+重复 Phase 1–9。其 fingerprint 为
+`sha256:d9108183177ac7c4821b466d28e0920d8a4a9bcd490a0edde956be3681233222`：
+5,193 files、5,069 UnityFS、2,305 candidates、2,304 success、1 uncertain、
+0 failed。两次 schema `1.1.0` 完整运行的 2,577,100-byte manifest 均为 SHA-256
+`d893ca25bbb86683d3b27cdf016c594afc3406be9fd1432e5b2398298a0d94d2`；
+两次增强审计也逐字节相同，file/schema/layout/group/event-reference/raw-accounting
+mismatch 全为 0。共享的 725 个 StageInfo source 与两个 note-data bundle 均逐字节
+相同，因此复用已证实的 disk parser/grouping family；GameAssembly 和 metadata 已变化，
+静态 offset 不复用。第二 profile 达到 **M8**，M7 仍保持部分验证口径。
+
+随后对最新 `1821...f0ab5` fingerprint 也补齐 schema `1.1.0` 第二次原地全量运行。
+两次 manifest 均为 2,606,521 bytes、SHA-256
+`20d1bcd8f9a733614d9e0ab968abe855220c34e7e4bb2d2f390916d3426db4ea`；
+第一轮独立审计的 15 类 mismatch 全为 0，第二轮使用新增 fail-closed manifest
+完整性检查后的 16 类审计，2,330 个文件、1,817,952 个导出 raw records 仍全部为 0。
+双跑通过覆盖同一输出树完成，不保留重复库。
 
 ---
 
@@ -1711,9 +1731,11 @@ CLI 和 scanner 可运行。
 
 # 11. 当前最优先任务
 
-M9 已完成。当前首要研究工作不是增加 GUI 或下游适配器，而是获取第二个真实游戏
-fingerprint，重复 Phase 1–9 的证据链，验证兼容层是否需要分叉，并扩大独立
-逐事件参考覆盖。未知版本继续保持 probe-only，不能通过降低门禁换取表面兼容。
+M9 已完成，第二个真实 fingerprint 的 Phase 1–9 兼容证据链也已闭合。当前首要研究工作
+不是增加 GUI 或下游适配器，而是扩大独立逐事件参考覆盖、恢复
+`tutorial_v2_map1` 的 song identity，并在获得第三个真实 fingerprint 时重复同一证据链。
+未知版本默认继续保持 probe-only；显式 research batch 也必须通过完整证据门禁并标记为
+非正式，不能通过降低门禁换取表面兼容。
 
 ---
 

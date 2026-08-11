@@ -30,6 +30,7 @@ SDIST_MEMBERS = {
         b"Metadata-Version: 2.4\nName: musedash-chart-extractor\nVersion: 0.1.0\n"
     ),
     "musedash_chart_extractor-0.1.0/tests/test_scanner.py": b"",
+    "musedash_chart_extractor-0.1.0/tools/audit_extracted_batch.py": b"",
     "musedash_chart_extractor-0.1.0/tools/audit_release_archives.py": b"",
 }
 

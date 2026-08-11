@@ -450,6 +450,7 @@ def extract_all_charts(
     canonicalizer: Callable[..., Any] = canonicalize_chart,
     chart_writer: Callable[[str | Path, Mapping[str, Any]], Path] = write_compact_json,
     extractor_version: str = __version__,
+    research_mode: bool = False,
 ) -> dict[str, Any]:
     """Extract and classify every supplied candidate, then write manifest last.
 
@@ -461,6 +462,8 @@ def extract_all_charts(
 
     root = validate_game_directory(game_dir)
     output = _output_root(root, output_dir)
+    if not isinstance(research_mode, bool):
+        raise BatchExtractionError("research_mode must be a boolean")
     if not candidates:
         raise BatchExtractionError("batch candidate set is empty")
     if expected_candidate_count is not None and len(candidates) != expected_candidate_count:
@@ -793,5 +796,14 @@ def extract_all_charts(
         ),
         "charts": rows,
     }
+    if research_mode:
+        manifest["profile_support"] = {
+            "formal_support": False,
+            "status": "unsupported-fingerprint-research",
+            "warning": (
+                "explicit research output; M8 evidence does not register this "
+                "fingerprint as formally supported"
+            ),
+        }
     write_compact_json(output / "manifest.json", manifest)
     return manifest

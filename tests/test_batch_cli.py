@@ -35,6 +35,17 @@ class BatchCliTests(unittest.TestCase):
             Path("diagnostics/grouping_census_summary.json"),
         )
         self.assertEqual(arguments.progress_every, 50)
+        self.assertFalse(arguments.allow_unsupported_research)
+
+        research_arguments = _build_parser().parse_args(
+            [
+                "extract-all",
+                "--game-dir",
+                "fixture-game",
+                "--allow-unsupported-research",
+            ]
+        )
+        self.assertTrue(research_arguments.allow_unsupported_research)
 
     def test_extract_all_loads_inputs_once_and_reports_manifest_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -72,6 +83,7 @@ class BatchCliTests(unittest.TestCase):
                 self.assertEqual(kwargs["song_index_file"], song_index_path)
                 self.assertEqual(kwargs["bundle_inventory_file"], bundle_inventory_path)
                 self.assertEqual(kwargs["grouping_census_summary_file"], census_path)
+                self.assertFalse(kwargs["allow_unsupported_research"])
                 kwargs["progress"](1, 1, "data/chart.bundle")
                 return SimpleNamespace(manifest=manifest)
 
@@ -110,6 +122,7 @@ class BatchCliTests(unittest.TestCase):
             )
             summary = json.loads(stdout.getvalue())
             self.assertEqual(summary["milestone_status"], "M8-achieved")
+            self.assertTrue(summary["formal_support"])
             self.assertEqual(summary["status_counts"], {"success": 1})
             self.assertEqual(
                 summary["batch_manifest"],
@@ -142,6 +155,56 @@ class BatchCliTests(unittest.TestCase):
             self.assertIn("must not be inside", stderr.getvalue())
             self.assertFalse(forbidden.exists())
             open_installation.assert_not_called()
+
+    def test_extract_all_research_summary_is_explicitly_nonformal(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            game_dir = root / "game"
+            game_dir.mkdir()
+            manifest = {
+                "status": "complete-with-classified-outcomes",
+                "milestone_status": "M8-achieved",
+                "candidate_count": 1,
+                "source_count": 1,
+                "chart_file_count": 1,
+                "event_count": 2,
+                "status_counts": {"success": 1},
+                "raw_parse_status_counts": {"parsed": 1},
+                "canonical_status_counts": {
+                    "canonicalized-with-raw-evidence": 1
+                },
+                "profile_support": {
+                    "formal_support": False,
+                    "status": "unsupported-fingerprint-research",
+                },
+            }
+            installation = SimpleNamespace()
+
+            def fake_extract(**kwargs):
+                self.assertTrue(kwargs["allow_unsupported_research"])
+                return SimpleNamespace(manifest=manifest)
+
+            installation.extract_charts = fake_extract
+            stdout = io.StringIO()
+            with patch(
+                "musedash_chart_extractor.installation.MuseDashInstallation.open",
+                return_value=installation,
+            ):
+                status = run(
+                    [
+                        "extract-all",
+                        "--game-dir",
+                        str(game_dir),
+                        "--output",
+                        str(root / "output"),
+                        "--allow-unsupported-research",
+                    ],
+                    stdout=stdout,
+                    stderr=io.StringIO(),
+                )
+
+            self.assertEqual(status, 0)
+            self.assertFalse(json.loads(stdout.getvalue())["formal_support"])
 
     def test_extract_all_rejects_negative_progress_interval_before_input_reads(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

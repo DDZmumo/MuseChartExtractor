@@ -22,6 +22,9 @@ from .scanner import (
 CURRENT_GAME_FINGERPRINT = (
     "sha256:1821d79ef6d53bca76c60491a2395496054fa473c31482ecc73b8d866c5f0ab5"
 )
+STEAM_DEPOT_241392741196033182_FINGERPRINT = (
+    "sha256:d9108183177ac7c4821b466d28e0920d8a4a9bcd490a0edde956be3681233222"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +47,17 @@ SUPPORTED_RESOURCE_PROFILES: Mapping[str, SupportedResourceProfile] = {
         parser_family="sirenix-odin-binary-observed-stageinfo-subset",
         grouping_rule_version="composite-neutral-base-negative-id-singleton-v2",
         evidence_status="M8-achieved-on-one-local-installation",
-    )
+    ),
+    STEAM_DEPOT_241392741196033182_FINGERPRINT: SupportedResourceProfile(
+        fingerprint=STEAM_DEPOT_241392741196033182_FINGERPRINT,
+        addressables_version="1.21.20",
+        build_result_hash="f4759f2e039525793e62c59c15df44c6",
+        parser_family="sirenix-odin-binary-observed-stageinfo-subset",
+        grouping_rule_version="composite-neutral-base-negative-id-singleton-v2",
+        evidence_status=(
+            "M8-achieved-on-steam-depot-manifest-241392741196033182"
+        ),
+    ),
 }
 
 
@@ -174,10 +187,15 @@ class MuseDashInstallation:
         bundle_inventory_file: str | Path | None = None,
         grouping_census_summary_file: str | Path | None = None,
         progress: Callable[[int, int, str], None] | None = None,
+        allow_unsupported_research: bool = False,
     ) -> ExtractedChartCollection:
-        """Extract all supported charts and return a lazy iterable over results."""
+        """Extract charts after the formal or explicit research-only gate."""
 
-        self.require_supported()
+        if not isinstance(allow_unsupported_research, bool):
+            raise ScannerError("allow_unsupported_research must be a boolean")
+        research_mode = self.profile is None
+        if research_mode and not allow_unsupported_research:
+            self.require_supported()
         diagnostics = Path(diagnostics_dir).expanduser().resolve()
         output = Path(output_dir).expanduser().resolve()
         candidate_path = Path(
@@ -230,6 +248,7 @@ class MuseDashInstallation:
             note_data_provenance=note_provenance,
             expected_candidate_count=census.get("candidate_count"),
             progress=progress,
+            research_mode=research_mode,
         )
         return ExtractedChartCollection(output_dir=output, manifest=manifest)
 
@@ -238,6 +257,7 @@ __all__ = [
     "CURRENT_GAME_FINGERPRINT",
     "ExtractedChartCollection",
     "MuseDashInstallation",
+    "STEAM_DEPOT_241392741196033182_FINGERPRINT",
     "SUPPORTED_RESOURCE_PROFILES",
     "SupportedResourceProfile",
     "UnknownGameVersionError",
