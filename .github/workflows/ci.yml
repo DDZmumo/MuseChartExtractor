@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest -m "not local_game" -q
+      - run: python -m compileall -q src tests
+
+  package:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install build twine
+      - run: python -m build
+      - run: python -m twine check dist/*
+      - run: python tools/audit_release_archives.py dist/*
+      - name: Install and run wheel
+        run: |
+          python -m venv /tmp/musedash-wheel
+          /tmp/musedash-wheel/bin/python -m pip install dist/*.whl
+          /tmp/musedash-wheel/bin/musedash-chart-extractor --version
+      - name: Install and run sdist
+        run: |
+          python -m venv /tmp/musedash-sdist
+          /tmp/musedash-sdist/bin/python -m pip install dist/*.tar.gz
+          /tmp/musedash-sdist/bin/musedash-chart-extractor --version
+      - name: Retain the audited release bytes
+        uses: actions/upload-artifact@v4
+        with:
+          name: musedash-chart-extractor-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: musedash-chart-extractor-${{ github.sha }}
+          path: dist
+      - name: Create GitHub release from the audited bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${GITHUB_REF_NAME}" dist/*
+          --repo "${GITHUB_REPOSITORY}"
+          --verify-tag
+          --generate-notes
+          --title "MuseDashChartExtractor ${GITHUB_REF_NAME}"

@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "musedash-chart-extractor"
+version = "0.1.0"
+description = "Read-only, offline extractor research tooling for locally installed Muse Dash resources."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "MuseDashChartExtractor contributors" },
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+]
+dependencies = [
+  "json5>=0.12,<1",
+  "UnityPy>=1.25.3,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2,<2",
+  "pytest>=8",
+]
+
+[project.scripts]
+musedash-chart-extractor = "musedash_chart_extractor.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/DDZmumo/MuseChartExtractor"
+Repository = "https://github.com/DDZmumo/MuseChartExtractor.git"
+Issues = "https://github.com/DDZmumo/MuseChartExtractor/issues"
+Changelog = "https://github.com/DDZmumo/MuseChartExtractor/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "local_game: requires a user-owned local Muse Dash installation and is excluded from CI",
+]

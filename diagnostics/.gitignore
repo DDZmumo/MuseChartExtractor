@@ -1,0 +1,3 @@
+# Local game inventories may contain installation-specific paths and hashes.
+*
+!.gitignore
