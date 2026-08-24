@@ -1371,3 +1371,68 @@ The final code review also added a fail-closed regression for nested symlinks or
 Windows junctions in `.staging`; writer cleanup now rejects such a tree before
 calling recursive deletion. The complete non-local suite after that change was
 171 passed, 4 deselected, with 55 subtests passed.
+
+## 2026-08-24 — `tutorial_v2_map1` identity investigation
+
+### Exact disk relationships
+
+The remaining unresolved chart is still the exact Addressables StageInfo entry:
+
+```text
+chart key:       tutorial_v2_map1
+chart hash key:  6cfcc6d3c7add2b48aea8c7b3f46145f
+bundle:          tutorialasset_assets_all_7225650d06960453d88de8c373e6a8b8.bundle
+bundle SHA-256:  68e75269be86905255fd9104bc12e5fa457adbf053136ae8ef5ed4d16493deb1
+container:       Assets/Static Resources/Data/Configs/StageInfos/tutorial_v2_map1.asset
+PathID:          1298721728685478299
+StageInfo music: tutorial_v2_music
+payload bytes:   117,356
+payload SHA-256: c730847fb44009b1c0b6ba9387085575336474050f1c874b1472ecaffa6654ad
+```
+
+The same bundle contains exactly one AudioClip container with the matching
+music key:
+
+```text
+Addressables key: tutorial_v2_music
+audio hash key:   2c295dcd2fb83e9409b7dd836ca6a72a
+container:        Assets/Static Resources/Data/Audio/Stage/Music/tutorial_v2_music.ogg
+PathID:           -1926141582245277989
+```
+
+The chart and AudioClip entries both depend on the same bundle entry `4999`.
+This is direct evidence that the StageInfo refers to a dedicated tutorial audio
+asset; it is stronger than a filename-only guess.
+
+### Missing identity evidence and counterexamples
+
+All 100 exact `ALBUM<N>.json` sources were searched through the normalized song
+index. They contain zero rows whose metadata refers to `tutorial_v2` or
+`tutorial_v2_music`. Consequently there is no observed ALBUM `uid`, title,
+artist, `noteJson`, or difficulty field for this chart.
+
+The older `tutorial_map1` and `tutorial_map2` objects are not evidence for a
+shared identity: their StageInfo `music` is `heart_pounding_flight_music`, which
+matches exactly one ALBUM row (`uid=0-5`), while `tutorial_v2_map1` explicitly
+uses the distinct `tutorial_v2_music` key. Reusing `0-5` would contradict the
+StageInfo field rather than resolve it.
+
+The local `global-metadata.dat` contains the exact strings
+`tutorial_v2_map1`, `tutorial_v2_music`, and `tutorial_v2`, near tutorial and
+music database strings. This is a bounded static lead only: the investigation
+did not recover a field, method, or serialized row proving that `tutorial_v2`
+is an official song UID. Addressables adds only the chart/audio keys and their
+opaque hash keys; neither is documented as an ALBUM identity.
+
+### Decision
+
+The current `song_id = ALBUM uid` rule remains unchanged. A synthetic ID derived
+from `tutorial_v2`, the chart key, the audio key, PathID, or MD5 would be a
+project invention and would incorrectly promote a special tutorial asset to a
+resolved ALBUM song. `tutorial_v2_map1` therefore remains explicit
+`unresolved/uncertain`; its Odin payload stays retained and auditable through
+`ChartStore.read_payload()`, while `load_chart()` continues to fail loudly.
+
+Future resolution requires a reproducible static tutorial-config relationship
+to an official identity or another independent official metadata source. The
+co-located audio relationship alone is intentionally insufficient.

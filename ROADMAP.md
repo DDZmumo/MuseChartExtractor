@@ -1863,6 +1863,15 @@ M10 已在当前 fingerprint 上完成，第二个真实 fingerprint 的 Phase 1
 未知版本默认继续保持 probe-only；显式 research batch 也必须通过完整证据门禁并标记为
 非正式，不能通过降低门禁换取表面兼容。
 
+2026-08-24 对 `tutorial_v2_map1` 的定点调查确认：它的 StageInfo、Addressables chart key
+和唯一 `tutorial_v2_music.ogg` AudioClip 位于同一个 tutorial bundle，三者的名称和依赖关系
+一致；但全部 100 份 ALBUM metadata 中没有对应 `uid`、`noteJson`、标题或难度行。
+Addressables 只额外提供资源 hash key，IL2CPP metadata 中的相关字符串也尚未恢复出可验证的
+字段/方法关系。因此这些证据只证明专用教程谱面与音频资产共存，不能生成符合现有
+`song_id = ALBUM uid` 契约的 song identity。该 chart 继续保持 `unresolved/uncertain`；下一步
+需要找到教程配置到正式 identity 的静态字段关系或其他独立官方 metadata，不能用文件名
+编造 song ID。
+
 ---
 
 # 12. Definition of Done
