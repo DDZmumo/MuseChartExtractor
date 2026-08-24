@@ -30,6 +30,56 @@ Until an event-level independent reference is explicitly supplied, every categor
 `not_compared`. The production extractor does not depend on a runtime export, Mod,
 injection, or game process.
 
+## Optional indexed event reference
+
+Current source accepts an optional event stream inside each aggregate reference:
+
+```json
+{
+  "chart_id": "example_map1",
+  "expected_combo": 123,
+  "source": {"kind": "visible-final-combo"},
+  "event_reference": {
+    "schema_version": "event-reference-v1",
+    "scope": "complete-indexed-sequence",
+    "source": {"kind": "independent-event-export"},
+    "time_tolerance_sec": "0.010",
+    "duration_tolerance_sec": "0.010",
+    "events": [
+      {
+        "index": 0,
+        "time_sec": "1.250",
+        "type_id": 1,
+        "is_air": false,
+        "duration_sec": null
+      }
+    ]
+  }
+}
+```
+
+The reference must describe the complete sequence with contiguous integer indices
+starting at zero. `time_sec` is required and uses an exact decimal string. `type_id`,
+`is_air`, and `duration_sec` are optional per event; a category is compared only when
+the reference supplies that field somewhere. Omitted categories remain
+`not_compared` rather than being inferred from canonical output.
+
+Comparison is deterministic by explicit index, not by greedy timestamp alignment.
+This makes missing and extra events visible instead of allowing a matcher to hide
+them. Time and duration tolerances are non-negative exact decimal strings. Reports
+include counts and at most ten bounded details per category; `matched` means that all
+fields supplied for that indexed row agree within tolerance.
+
+`event_reference.source.kind` is required so synthetic fixtures, manual review,
+runtime exports, and other independent sources cannot be confused. Supplying a
+partial-field or synthetic reference does not establish full semantic accuracy. Reference
+files containing official-derived event streams are local research artifacts and
+must not be committed or redistributed.
+
+The retained real validation references currently contain aggregate combo counts
+only. Event-reference support is therefore implemented and synthetic-tested, but it
+does not retroactively advance the project's M7 evidence claim.
+
 For a complete schema `1.1.0` batch, `tools/audit_extracted_batch.py`
 independently reopens every successful file. It checks the manifest path,
 size, and SHA-256; the single raw-table layout; raw index uniqueness; gameplay

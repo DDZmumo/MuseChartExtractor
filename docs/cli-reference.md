@@ -224,6 +224,31 @@ lane_mismatch
 duration_delta
 ```
 
+如有独立、完整且已经按 logical index 对齐的事件流，可以在同一 reference row 中加入：
+
+```json
+{
+  "chart_id": "example_map1",
+  "expected_combo": 123,
+  "source": {"kind": "visible-final-combo"},
+  "event_reference": {
+    "schema_version": "event-reference-v1",
+    "scope": "complete-indexed-sequence",
+    "source": {"kind": "independent-event-export"},
+    "time_tolerance_sec": "0.010",
+    "duration_tolerance_sec": "0.010",
+    "events": [
+      {"index": 0, "time_sec": "1.250", "type_id": 1, "is_air": false}
+    ]
+  }
+}
+```
+
+上例是 synthetic 格式示例。实际 reference 必须列出从 0 开始、
+无缺口的完整事件序列；比较按 index 进行，不做贪心时间对齐。`time_sec` 必填，其他字段只在
+明确提供时比较，省略类别保持 `not_compared`。事件 reference 必须保留独立来源 provenance，
+含官方衍生事件流的文件只能留在本地，不能提交或再分发。
+
 详见 [validation.md](validation.md)。
 
 ## grouping-census - 全库分组门禁

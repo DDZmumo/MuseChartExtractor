@@ -52,7 +52,10 @@ sdist, and wheel contain only source, docs, and synthetic fixtures.
   wire reader.
 - `discovery/`: StageInfo evidence, raw extraction, grouping, note config, and
   song/chart relationships.
-- `charts/`: canonical model, lossless projection, validation.
+- `charts/`: canonical model, lossless projection, structural/aggregate
+  validation, and optional provenance-bearing indexed event-reference comparison.
+- `charts/event_reference.py`: strict `event-reference-v1` input validation and
+  deterministic per-index difference accounting, isolated from the main chart validator.
 - Canonical raw evidence uses one `raw_records` table and one `record_groups`
   table. Events retain only raw indices; derived Phase 5 `logical_objects` are
   omitted only after exact reconstruction equality succeeds.

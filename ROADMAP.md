@@ -1149,6 +1149,13 @@ lane_mismatch
 duration_delta
 ```
 
+当前 `validate` 还接受可选 `event-reference-v1`：reference 必须声明
+`complete-indexed-sequence`，使用从 0 开始的连续 index，并为独立来源保存非空 provenance。
+`time_sec` 必填；`type_id`、`is_air`、`duration_sec` 只在 reference 明确提供时比较，省略的
+类别继续为 `not_compared`。比较按 index 确定性进行，不使用可能掩盖 missing/extra 的贪心
+时间对齐。该能力已有 synthetic fixture，但当前真实参考仍只有 aggregate combo，因此它只
+补齐验证基础设施，不改变既有 M7 partial 证据范围。
+
 ---
 
 ## 输出

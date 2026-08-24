@@ -1436,3 +1436,61 @@ resolved ALBUM song. `tutorial_v2_map1` therefore remains explicit
 Future resolution requires a reproducible static tutorial-config relationship
 to an official identity or another independent official metadata source. The
 co-located audio relationship alone is intentionally insufficient.
+
+## 2026-08-24 — Indexed event-reference validation foundation
+
+The existing validation report reserved seven event-level difference categories
+but correctly left them `not_compared`, because the retained real references
+contain aggregate combo counts rather than event streams. The current source now
+implements an optional, separately versioned input contract without changing
+that historical evidence:
+
+```text
+schema:                 event-reference-v1
+scope:                  complete-indexed-sequence
+identity:               canonical chart_id + contiguous event index
+required event field:   exact decimal time_sec
+optional event fields:  type_id, is_air, exact decimal duration_sec
+required provenance:    non-empty source.kind
+matching:               deterministic by index; no greedy time alignment
+reported detail limit:  10 rows per difference category
+```
+
+Missing and extra rows are derived from complete sequence lengths. Timing and
+duration use explicit non-negative exact-decimal tolerances. A row contributes
+to `matched` only when every field actually supplied for that index agrees;
+an omitted field leaves its category `not_compared`. Malformed schema, scope,
+provenance, decimal values, field types, or non-contiguous indices fail before a
+report is written.
+
+Synthetic regressions cover a complete match, each difference category,
+shorter/longer streams, provenance, index continuity, legacy aggregate-only
+behavior, CLI JSON/Markdown output, and bounded claim wording. The complete
+non-local suite after this addition passed with 175 tests, one platform skip,
+four deselected local-game tests, and 55 subtests. The skip is the Windows
+symlink-specific Store audit case under a process without symlink privileges;
+all executed tests passed. `compileall`, wheel/sdist build in a unique output
+directory, and both release archive audits also passed.
+
+Backward compatibility was checked against the three retained Urban Magic
+Canonical `1.1.0` files and the existing aggregate references on fingerprint
+`sha256:1821d79ef6d53bca76c60491a2395496054fa473c31482ecc73b8d866c5f0ab5`.
+All three charts remained structurally valid, source-verified, aggregate-matched,
+and `partially-validated-aggregate-combo-match`; event-reference compared/matched/
+mismatch counts stayed `0/0/0`, and every event-level category remained
+`not_compared`. The new metadata-only compatibility report hashes are:
+
+```text
+JSON:     422a67be5fdf7e0d85111aa8b898fe92407ad939e0d84e503fb7cc43e93ce7d8
+Markdown: 97aa99dc970b45bec23f99844775e3d7558f59441a55dcfb5c281de352b8cbd7
+```
+
+After the comparison implementation was isolated into
+`charts/event_reference.py`, the same real aggregate-only command was repeated
+to new output paths. Both JSON and Markdown hashes remained byte-identical to
+the values above, confirming that the module split did not change legacy report
+behavior.
+
+No real event stream was added. This work makes event-level evidence measurable
+when independently supplied; it does not retroactively validate timing, type,
+lane, air/ground, or duration and does not advance the existing M7 partial claim.

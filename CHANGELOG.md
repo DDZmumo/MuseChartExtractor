@@ -8,6 +8,10 @@ separately.
 
 ### Added
 
+- Add optional `event-reference-v1` validation input for complete indexed event
+  streams. It compares exact time/type/lane/duration fields without greedy
+  alignment, reports bounded per-category differences, and leaves omitted
+  fields explicitly `not_compared`.
 - Add physical Chart Store schema `1.0.0`: exact Odin Binary payloads are
   content-addressed by SHA-256 while standard-library SQLite stores source,
   chart, StageInfo, song, and shared note-config indexes without payload BLOBs.

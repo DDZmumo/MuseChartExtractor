@@ -71,6 +71,69 @@ class ValidationCliTests(unittest.TestCase):
                 markdown_path.read_text(encoding="utf-8"),
             )
 
+    def test_validate_compares_complete_indexed_event_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            chart = _chart("fixture_map1", "a" * 64)
+            chart_path = root / "chart.json"
+            chart_path.write_text(json.dumps(chart), encoding="utf-8")
+            reference = {
+                "schema_version": 1,
+                "references": [
+                    {
+                        "chart_id": "fixture_map1",
+                        "expected_combo": 3,
+                        "event_reference": {
+                            "schema_version": "event-reference-v1",
+                            "scope": "complete-indexed-sequence",
+                            "source": {"kind": "synthetic-cli-fixture"},
+                            "events": [
+                                {
+                                    "index": event["index"],
+                                    "time_sec": event["time_sec"],
+                                    "type_id": event["type_id"],
+                                    "duration_sec": event["duration_sec"],
+                                }
+                                for event in chart["events"]
+                            ],
+                        },
+                    }
+                ],
+            }
+            reference_path = root / "references.json"
+            reference_path.write_text(json.dumps(reference), encoding="utf-8")
+            report_path = root / "validation.json"
+            markdown_path = root / "validation.md"
+            stdout = io.StringIO()
+
+            status = run(
+                [
+                    "validate",
+                    "--chart",
+                    str(chart_path),
+                    "--reference-file",
+                    str(reference_path),
+                    "--output",
+                    str(report_path),
+                    "--markdown-output",
+                    str(markdown_path),
+                ],
+                stdout=stdout,
+                stderr=io.StringIO(),
+            )
+
+            self.assertEqual(status, 0)
+            summary = json.loads(stdout.getvalue())
+            self.assertEqual(summary["event_reference_compared_count"], 1)
+            self.assertEqual(summary["event_reference_matched_count"], 1)
+            self.assertEqual(summary["event_reference_mismatch_count"], 0)
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["charts"][0]["event_reference"]["status"], "matched")
+            self.assertIn(
+                "scoped to explicitly supplied event-reference fields",
+                markdown_path.read_text(encoding="utf-8"),
+            )
+
     def test_validate_refuses_outputs_inside_game_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             game_dir = Path(temporary) / "game"

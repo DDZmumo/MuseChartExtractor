@@ -16,18 +16,14 @@ from typing import Any
 
 from ..scanner import ScannerError, fingerprint_file, validate_game_directory
 from .canonicalize import CanonicalizationError, reconstruct_experimental_chart
+from .event_reference import (
+    DIFFERENCE_CATEGORIES,
+    EventReferenceInputError,
+    compare_event_reference,
+)
 
 VALIDATION_SCHEMA_VERSION = "validation-report-v1"
 ADD_COMBO_TYPE_IDS = frozenset({1, 3, 4, 5, 8})
-DIFFERENCE_CATEGORIES = (
-    "matched",
-    "missing_offline",
-    "extra_offline",
-    "timing_delta",
-    "type_mismatch",
-    "lane_mismatch",
-    "duration_delta",
-)
 
 _DECIMAL_PATTERN = re.compile(
     r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\Z"
@@ -541,15 +537,21 @@ def _raw_accounting(
     }
 
 
-def _not_compared_differences() -> dict[str, dict[str, Any]]:
-    return {
-        category: {
-            "status": "not_compared",
-            "count": None,
-            "details": [],
-        }
-        for category in DIFFERENCE_CATEGORIES
-    }
+def _event_reference_check(
+    chart_id: str | None,
+    offline_events: Sequence[Mapping[str, Any]],
+    structural_valid: bool,
+    reference: Mapping[str, Any] | None,
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    try:
+        return compare_event_reference(
+            chart_id,
+            offline_events,
+            structural_valid,
+            reference,
+        )
+    except EventReferenceInputError as exc:
+        raise ValidationInputError(str(exc)) from exc
 
 
 def _reference_check(
@@ -576,6 +578,14 @@ def _reference_check(
             "projected_combo": projected_combo,
             "source": reference.get("source"),
             "reason": "reference chart_id does not match canonical chart_id",
+        }
+    if "expected_combo" not in reference:
+        return {
+            "status": "not_provided",
+            "scope": "none",
+            "expected_combo": None,
+            "projected_combo": projected_combo,
+            "source": reference.get("source"),
         }
     if not _is_integer(expected_combo) or expected_combo < 0:
         return {
@@ -863,8 +873,28 @@ def validate_canonical_chart(
         )
 
     structural_valid = not errors
+    event_reference_check, differences = _event_reference_check(
+        chart_id,
+        events,
+        structural_valid,
+        reference,
+    )
+    if event_reference_check["status"] == "mismatch":
+        warnings.append(
+            _issue(
+                "event_reference_mismatch",
+                "reference.event_reference",
+                "one or more indexed event-level differences were detected",
+            )
+        )
     if not structural_valid:
         status = "structurally-invalid"
+    elif event_reference_check["status"] == "mismatch":
+        status = "structurally-valid-event-reference-mismatch"
+    elif reference_check["status"] == "invalid_reference":
+        status = "structurally-valid-reference-invalid"
+    elif event_reference_check["status"] == "matched":
+        status = "event-level-reference-match"
     elif reference_check["status"] == "matched":
         status = "partially-validated-aggregate-combo-match"
     elif reference_check["status"] == "mismatch":
@@ -919,14 +949,18 @@ def validate_canonical_chart(
             "warnings": warnings,
         },
         "reference": reference_check,
-        "differences": _not_compared_differences(),
+        "event_reference": event_reference_check,
+        "differences": differences,
         "comparison_scope": {
             "aggregate_combo": reference_check["status"],
-            "event_level": "not_compared",
-            "claim": (
-                "No event-level reference was supplied; timing, type, lane, air/ground, "
-                "and duration accuracy remain unverified by this report."
+            "event_level": (
+                "not_compared"
+                if event_reference_check["status"]
+                in {"not_provided", "not_compared", "invalid_reference"}
+                else event_reference_check["status"]
             ),
+            "event_level_fields": event_reference_check["compared_fields"],
+            "claim": event_reference_check["claim_limit"],
         },
     }
 
@@ -1008,6 +1042,18 @@ def validate_canonical_charts(
         report["reference"]["status"] in {"mismatch", "invalid_reference"}
         for report in chart_reports
     )
+    event_reference_compared_count = sum(
+        report["event_reference"]["status"] in {"matched", "mismatch"}
+        for report in chart_reports
+    )
+    event_reference_matched_count = sum(
+        report["event_reference"]["status"] == "matched"
+        for report in chart_reports
+    )
+    event_reference_mismatch_count = sum(
+        report["event_reference"]["status"] in {"mismatch", "invalid_reference"}
+        for report in chart_reports
+    )
     unreferenced_ids = sorted(reference_by_chart.keys() - seen_chart_ids)
     milestone_achieved = (
         len(chart_reports) >= 2
@@ -1018,8 +1064,17 @@ def validate_canonical_charts(
         and reference_matched_count == len(chart_reports)
     )
     if milestone_achieved:
-        status = "partially-validated-multiple-charts"
-    elif structural_valid_count != len(chart_reports) or reference_mismatch_count:
+        status = (
+            "event-referenced-multiple-charts"
+            if event_reference_compared_count == len(chart_reports)
+            and event_reference_matched_count == len(chart_reports)
+            else "partially-validated-multiple-charts"
+        )
+    elif (
+        structural_valid_count != len(chart_reports)
+        or reference_mismatch_count
+        or event_reference_mismatch_count
+    ):
         status = "validation-failed"
     else:
         status = "validation-incomplete"
@@ -1050,9 +1105,18 @@ def validate_canonical_charts(
         "validation_scope": {
             "structural": "canonical structure, exact decimals, provenance, and raw accounting",
             "semantic": "distributions and static addCombo aggregate projection",
-            "reference": "aggregate combo only",
-            "event_level_reference": "not_compared",
-            "accuracy_claim": "partial; this report does not claim 100% event accuracy",
+            "reference": "aggregate combo and optional indexed event stream",
+            "event_level_reference": (
+                "complete indexed sequences for explicitly supplied fields"
+                if event_reference_compared_count
+                else "not_compared"
+            ),
+            "accuracy_claim": (
+                "event references cover only explicitly supplied fields; omitted fields "
+                "and charts remain unverified"
+                if event_reference_compared_count
+                else "partial; this report does not claim 100% event accuracy"
+            ),
         },
         "summary": {
             "chart_count": len(chart_reports),
@@ -1060,6 +1124,9 @@ def validate_canonical_charts(
             "source_verified_count": source_verified_count,
             "reference_matched_count": reference_matched_count,
             "reference_mismatch_count": reference_mismatch_count,
+            "event_reference_compared_count": event_reference_compared_count,
+            "event_reference_matched_count": event_reference_matched_count,
+            "event_reference_mismatch_count": event_reference_mismatch_count,
             "duplicate_chart_ids": sorted(set(duplicate_chart_ids)),
             "references_without_chart": unreferenced_ids,
         },
@@ -1078,6 +1145,14 @@ def render_validation_markdown(report: Mapping[str, Any]) -> str:
     """Render a compact human-readable companion to a JSON validation report."""
 
     summary = report.get("summary") if isinstance(report.get("summary"), Mapping) else {}
+    event_reference_compared = summary.get("event_reference_compared_count", 0)
+    event_reference_matched = summary.get("event_reference_matched_count", 0)
+    accuracy_line = (
+        "- Accuracy claim: scoped to explicitly supplied event-reference fields; "
+        "omitted fields and charts remain unverified."
+        if event_reference_compared
+        else "- Accuracy claim: partial; no event-level reference was compared."
+    )
     lines = [
         "# Chart validation report",
         "",
@@ -1087,10 +1162,12 @@ def render_validation_markdown(report: Mapping[str, Any]) -> str:
         f"- Structurally valid: {_markdown_cell(summary.get('structural_valid_count'))}",
         f"- Source verified: {_markdown_cell(summary.get('source_verified_count'))}",
         f"- Aggregate references matched: {_markdown_cell(summary.get('reference_matched_count'))}",
-        "- Accuracy claim: partial; no event-level reference was compared.",
+        f"- Event references compared: {_markdown_cell(event_reference_compared)}",
+        f"- Event references matched: {_markdown_cell(event_reference_matched)}",
+        accuracy_line,
         "",
-        "| Chart | Structural | Source | Projected combo | Reference | Status |",
-        "| --- | --- | --- | ---: | --- | --- |",
+        "| Chart | Structural | Source | Projected combo | Aggregate reference | Event reference | Status |",
+        "| --- | --- | --- | ---: | --- | --- | --- |",
     ]
     charts = report.get("charts")
     if not isinstance(charts, list):
@@ -1101,6 +1178,7 @@ def render_validation_markdown(report: Mapping[str, Any]) -> str:
         structural = chart.get("structural")
         semantic = chart.get("semantic")
         reference = chart.get("reference")
+        event_reference = chart.get("event_reference")
         source = structural.get("source", {}) if isinstance(structural, Mapping) else {}
         projection = (
             semantic.get("add_combo_projection", {})
@@ -1119,6 +1197,11 @@ def render_validation_markdown(report: Mapping[str, Any]) -> str:
                     if isinstance(projection, Mapping)
                     else None,
                     reference.get("status") if isinstance(reference, Mapping) else None,
+                    (
+                        event_reference.get("status")
+                        if isinstance(event_reference, Mapping)
+                        else None
+                    ),
                     chart.get("status"),
                 )
             )
@@ -1126,10 +1209,17 @@ def render_validation_markdown(report: Mapping[str, Any]) -> str:
         )
 
     lines.extend(["", "## Difference categories", ""])
-    lines.append(
-        "The supplied references contain aggregate combo counts only. Every event-level "
-        "difference category therefore remains `not_compared`."
-    )
+    if event_reference_compared:
+        lines.append(
+            "Indexed event references were compared only for their explicitly supplied "
+            "fields. A `not_compared` category was omitted by the reference and remains "
+            "unverified."
+        )
+    else:
+        lines.append(
+            "The supplied references contain aggregate combo counts only. Every event-level "
+            "difference category therefore remains `not_compared`."
+        )
     lines.extend(["", "| Chart | Category | Status |", "| --- | --- | --- |"])
     for chart in charts:
         if not isinstance(chart, Mapping):

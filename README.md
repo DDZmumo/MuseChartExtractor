@@ -106,7 +106,7 @@ musedash-chart-extractor audit-store `
 - **Canonical Chart schema 1.1**：单一 raw-record table，event 仅通过原始 index 引用。
 - **Compact Store schema 1.0**：原始 Odin bytes 内容寻址，SQLite 只保存共享索引，单图懒解析。
 - **未知信息保真**：未知字段与未知 type 不会被删除或强行映射。
-- **验证与独立审计**：检查来源 SHA、Decimal、事件结构、raw index 闭包与全量文件 manifest。
+- **验证与独立审计**：检查来源 SHA、Decimal、事件结构、raw index 闭包与全量文件 manifest；可选完整索引事件参考会按明确提供的 time/type/lane/duration 字段生成差异报告。
 - **通用输出接口**：内置 JSON、CSV 与 Python API，不绑定 MusePlay、YOLO 或 AutoPlay。
 - **版本 fail-closed**：未知 fingerprint 默认只能 scan/probe，不会静默套用已知 parser。
 
@@ -142,7 +142,7 @@ flowchart LR
 | Store 审计 | 13 类 mismatch 全为 0；733 sources / 2,331 charts 源复核通过 |
 | 确定性 | 两轮 Store manifest、SQLite、logical digest、payload set 均相同 |
 | Canonical 等价 | 2,330 / 2,330 resolved charts 完全相等，mismatch 0 |
-| 语义验证 | M7 partial，不宣称全库逐事件 100% 对照 |
+| 语义验证 | M7 partial；逐事件参考比较能力已实现，但当前真实参考仍只有 aggregate，未宣称全库逐事件 100% 对照 |
 
 正式支持按完整安装 fingerprint 判定，而不是按游戏营销版本或 Steam BuildID 猜测：
 
@@ -157,8 +157,9 @@ flowchart LR
 > [!NOTE]
 > “精确核对”目前表示磁盘来源、文件哈希、结构解析、raw-record accounting 和重复执行
 > 确定性已闭环；Compact Store 还与旧 Canonical 树逐张完全比较。本轮没有新增人工视频
-> 复核。独立逐事件参考尚未覆盖全部谱面，因此 timing/type/lane/duration 的全库
-> 比较仍明确为 `not_compared`；`tutorial_v2_map1` 也继续保留为 unresolved/uncertain。
+> 复核。validator 现在接受带 provenance 的完整索引事件参考；没有提供的字段仍保持
+> `not_compared`。当前保留的真实参考仍没有事件流，因此 timing/type/lane/duration 的全库
+> 比较没有被追溯性提升；`tutorial_v2_map1` 也继续保留为 unresolved/uncertain。
 
 ## Python API
 

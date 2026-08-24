@@ -922,6 +922,15 @@ def _run_validate(arguments: argparse.Namespace, stdout: TextIO) -> int:
                 "structural_valid_count": summary["structural_valid_count"],
                 "source_verified_count": summary["source_verified_count"],
                 "reference_matched_count": summary["reference_matched_count"],
+                "event_reference_compared_count": summary[
+                    "event_reference_compared_count"
+                ],
+                "event_reference_matched_count": summary[
+                    "event_reference_matched_count"
+                ],
+                "event_reference_mismatch_count": summary[
+                    "event_reference_mismatch_count"
+                ],
                 "validation_report": str(destination.resolve()),
                 "validation_markdown": str(markdown_destination.resolve()),
             },

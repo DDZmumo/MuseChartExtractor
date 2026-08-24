@@ -3,11 +3,11 @@ from __future__ import annotations
 import hashlib
 import tempfile
 import unittest
-from copy import deepcopy
 from pathlib import Path
 
 from musedash_chart_extractor.charts.validator import (
     DIFFERENCE_CATEGORIES,
+    ValidationInputError,
     render_validation_markdown,
     validate_canonical_chart,
     validate_canonical_charts,
@@ -291,6 +291,146 @@ class CanonicalValidatorTests(unittest.TestCase):
         for category in DIFFERENCE_CATEGORIES:
             self.assertIn(f"| fixture_map1 | {category} | not_compared |", markdown)
         self.assertIn("no event-level reference was compared", markdown)
+
+    def test_complete_indexed_event_reference_compares_explicit_fields(self) -> None:
+        chart = _chart("fixture_map1", "a" * 64)
+        chart["events"][0]["is_air"] = False
+        chart["events"][1]["is_air"] = True
+        chart["events"][2]["is_air"] = False
+        reference = {
+            "chart_id": "fixture_map1",
+            "expected_combo": 3,
+            "event_reference": {
+                "schema_version": "event-reference-v1",
+                "scope": "complete-indexed-sequence",
+                "source": {"kind": "synthetic-independent-event-stream"},
+                "time_tolerance_sec": "0.01",
+                "duration_tolerance_sec": "0.001",
+                "events": [
+                    {
+                        "index": 0,
+                        "time_sec": "0.251",
+                        "type_id": 1,
+                        "is_air": False,
+                        "duration_sec": None,
+                    },
+                    {
+                        "index": 1,
+                        "time_sec": "1.0",
+                        "type_id": 3,
+                        "is_air": True,
+                        "duration_sec": "2.5005",
+                    },
+                    {
+                        "index": 2,
+                        "time_sec": "4",
+                        "type_id": 99,
+                        "is_air": False,
+                        "duration_sec": None,
+                    },
+                ],
+            },
+        }
+
+        report = validate_canonical_chart(chart, reference=reference)
+
+        self.assertEqual(report["event_reference"]["status"], "matched")
+        self.assertEqual(
+            report["event_reference"]["compared_fields"],
+            ["time_sec", "type_id", "is_air", "duration_sec"],
+        )
+        self.assertEqual(report["differences"]["matched"]["count"], 3)
+        for category in DIFFERENCE_CATEGORIES[1:]:
+            self.assertEqual(report["differences"][category]["status"], "compared")
+            self.assertEqual(report["differences"][category]["count"], 0)
+        self.assertEqual(report["comparison_scope"]["event_level"], "matched")
+
+    def test_event_reference_reports_each_difference_without_greedy_alignment(self) -> None:
+        chart = _chart("fixture_map1", "a" * 64)
+        chart["events"][0]["is_air"] = False
+        chart["events"][1]["is_air"] = True
+        chart["events"][2]["is_air"] = False
+        reference = {
+            "chart_id": "fixture_map1",
+            "event_reference": {
+                "schema_version": "event-reference-v1",
+                "scope": "complete-indexed-sequence",
+                "source": {"kind": "synthetic-independent-event-stream"},
+                "time_tolerance_sec": "0.01",
+                "duration_tolerance_sec": "0.01",
+                "events": [
+                    {
+                        "index": 0,
+                        "time_sec": "0.5",
+                        "type_id": 2,
+                        "is_air": True,
+                        "duration_sec": None,
+                    },
+                    {
+                        "index": 1,
+                        "time_sec": "1.0",
+                        "type_id": 3,
+                        "is_air": True,
+                        "duration_sec": "3.0",
+                    },
+                    {"index": 2, "time_sec": "4"},
+                    {"index": 3, "time_sec": "5"},
+                ],
+            },
+        }
+
+        report = validate_canonical_chart(chart, reference=reference)
+        differences = report["differences"]
+
+        self.assertEqual(report["event_reference"]["status"], "mismatch")
+        self.assertEqual(differences["matched"]["count"], 1)
+        self.assertEqual(differences["missing_offline"]["count"], 1)
+        self.assertEqual(differences["extra_offline"]["count"], 0)
+        self.assertEqual(differences["timing_delta"]["count"], 1)
+        self.assertEqual(differences["type_mismatch"]["count"], 1)
+        self.assertEqual(differences["lane_mismatch"]["count"], 1)
+        self.assertEqual(differences["duration_delta"]["count"], 1)
+        self.assertEqual(
+            report["status"], "structurally-valid-event-reference-mismatch"
+        )
+
+    def test_shorter_event_reference_reports_extra_offline_events(self) -> None:
+        chart = _chart("fixture_map1", "a" * 64)
+        reference = {
+            "chart_id": "fixture_map1",
+            "event_reference": {
+                "schema_version": "event-reference-v1",
+                "scope": "complete-indexed-sequence",
+                "source": {"kind": "synthetic-independent-event-stream"},
+                "events": [
+                    {"index": 0, "time_sec": "0.25"},
+                    {"index": 1, "time_sec": "1.0"},
+                ],
+            },
+        }
+
+        report = validate_canonical_chart(chart, reference=reference)
+
+        self.assertEqual(report["differences"]["extra_offline"]["count"], 1)
+        self.assertEqual(report["differences"]["missing_offline"]["count"], 0)
+
+    def test_event_reference_requires_provenance_and_contiguous_indices(self) -> None:
+        chart = _chart("fixture_map1", "a" * 64)
+        reference = {
+            "chart_id": "fixture_map1",
+            "event_reference": {
+                "schema_version": "event-reference-v1",
+                "scope": "complete-indexed-sequence",
+                "source": {},
+                "events": [{"index": 1, "time_sec": "0.25"}],
+            },
+        }
+
+        with self.assertRaisesRegex(ValidationInputError, "source"):
+            validate_canonical_chart(chart, reference=reference)
+        reference["event_reference"]["source"] = {"kind": "synthetic"}
+        with self.assertRaisesRegex(ValidationInputError, "contiguous"):
+            validate_canonical_chart(chart, reference=reference)
 
     def test_no_game_directory_keeps_m7_incomplete_even_when_counts_match(self) -> None:
         digest = "a" * 64
