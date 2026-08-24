@@ -15,6 +15,7 @@ from .store import (
     ChartStoreError,
     STORE_SCHEMA_VERSION,
     UnresolvedChartError,
+    digest_chart_store,
 )
 
 __all__ = [
@@ -31,4 +32,5 @@ __all__ = [
     "UnresolvedChartError",
     "UnknownGameVersionError",
     "__version__",
+    "digest_chart_store",
 ]

@@ -1,6 +1,7 @@
 """Compact content-addressed chart store API."""
 
 from .audit import audit_chart_store
+from .canonical_digest import digest_chart_store
 from .equivalence import compare_chart_store_to_canonical_tree
 from .reader import ChartRef, ChartStore
 from .schema import (
@@ -25,6 +26,7 @@ __all__ = [
     "UnresolvedChartError",
     "audit_chart_store",
     "compare_chart_store_to_canonical_tree",
+    "digest_chart_store",
     "extract_chart_store",
     "path_is_link",
 ]

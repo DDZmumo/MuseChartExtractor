@@ -18,6 +18,7 @@ local installation
   -> validation
   -> content-addressed raw Odin Store 1.0.0 + SQLite index
   -> lazy Canonical Chart 1.1.0
+  -> Store-only streaming Canonical corpus digest
   -> on-demand JSON / CSV exporters
 ```
 
@@ -44,6 +45,12 @@ only after full extraction and independent audit evidence exists.
 are Git ignored. `.odin`, SQLite Store indexes, Store manifests, and payload
 directories are also rejected by the release archive auditor. The package,
 sdist, and wheel contain only source, docs, and synthetic fixtures.
+
+Compact Store is the default full-library persistence and acceptance boundary.
+`extract-all` is a guarded legacy/research path that requires
+`--allow-expanded-json`; normal validation must not materialize an approximately
+14 GiB Canonical JSON tree. Single-chart or explicitly bounded JSON/CSV exports
+remain supported through the lazy reader and neutral exporters.
 
 ## Parser layers
 
@@ -73,6 +80,9 @@ sdist, and wheel contain only source, docs, and synthetic fixtures.
   audit with optional source bundle and PathID revalidation.
 - `store/equivalence.py`: one-chart-at-a-time semantic comparison with a legacy
   Canonical JSON tree; reports only counts and hashes.
+- `store/canonical_digest.py`: Store-only streaming digest that reuses the same
+  stable Canonical encoder and corpus framing, validates expected counts/digests,
+  and retains only bounded failures without writing chart JSON.
 - `installation.py`: supported-version gate and public Python facade.
 - `exporters/`: neutral destination protocols and JSON/CSV views.
 
@@ -99,6 +109,12 @@ hashes one file. `load_chart()` parses one Odin stream, joins only its reference
 global note configs and indexed song, and then invokes the existing grouping and
 canonicalization path. The Store layer has no MusePlay-specific dependency;
 downstream dependency direction remains `consumer -> MuseDashChartExtractor`.
+
+Full Store acceptance runs in place: rebuild the same Store while validating and
+reusing content-addressed payloads, run a source-aware independent audit, stream a
+Canonical corpus digest, then repeat and compare metadata/hash snapshots. This
+keeps peak Canonical memory bounded by one chart and avoids a second payload corpus
+or any expanded JSON corpus.
 
 ## Failure model
 

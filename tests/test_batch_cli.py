@@ -36,6 +36,7 @@ class BatchCliTests(unittest.TestCase):
         )
         self.assertEqual(arguments.progress_every, 50)
         self.assertFalse(arguments.allow_unsupported_research)
+        self.assertFalse(arguments.allow_expanded_json)
 
         research_arguments = _build_parser().parse_args(
             [
@@ -43,9 +44,43 @@ class BatchCliTests(unittest.TestCase):
                 "--game-dir",
                 "fixture-game",
                 "--allow-unsupported-research",
+                "--allow-expanded-json",
             ]
         )
         self.assertTrue(research_arguments.allow_unsupported_research)
+        self.assertTrue(research_arguments.allow_expanded_json)
+
+    def test_extract_all_requires_explicit_large_json_opt_in(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            game_dir = root / "game"
+            game_dir.mkdir()
+            output_dir = root / "extracted"
+            stderr = io.StringIO()
+
+            with patch(
+                "musedash_chart_extractor.installation.MuseDashInstallation.open"
+            ) as open_installation:
+                status = run(
+                    [
+                        "extract-all",
+                        "--game-dir",
+                        str(game_dir),
+                        "--output",
+                        str(output_dir),
+                    ],
+                    stdout=io.StringIO(),
+                    stderr=stderr,
+                )
+
+            self.assertEqual(status, 2)
+            message = stderr.getvalue()
+            self.assertIn("--allow-expanded-json", message)
+            self.assertIn("14 GiB", message)
+            self.assertIn("extract-store", message)
+            self.assertIn("official-derived", message)
+            self.assertFalse(output_dir.exists())
+            open_installation.assert_not_called()
 
     def test_extract_all_loads_inputs_once_and_reports_manifest_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -109,6 +144,7 @@ class BatchCliTests(unittest.TestCase):
                         str(census_path),
                         "--progress-every",
                         "1",
+                        "--allow-expanded-json",
                     ],
                     stdout=stdout,
                     stderr=stderr,
@@ -146,6 +182,7 @@ class BatchCliTests(unittest.TestCase):
                         str(game_dir),
                         "--output",
                         str(forbidden),
+                        "--allow-expanded-json",
                     ],
                     stdout=io.StringIO(),
                     stderr=stderr,
@@ -198,6 +235,7 @@ class BatchCliTests(unittest.TestCase):
                         "--output",
                         str(root / "output"),
                         "--allow-unsupported-research",
+                        "--allow-expanded-json",
                     ],
                     stdout=stdout,
                     stderr=io.StringIO(),
@@ -222,6 +260,7 @@ class BatchCliTests(unittest.TestCase):
                     str(root / "extracted"),
                     "--progress-every",
                     "-1",
+                    "--allow-expanded-json",
                 ],
                 stdout=io.StringIO(),
                 stderr=stderr,

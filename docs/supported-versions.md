@@ -23,6 +23,12 @@ payloads are retained, independent Store audit reports zero mismatches,
 2,330/2,330 lazy Canonical reconstructions equal the old JSON objects, and a
 same-directory second build produced identical manifest and SQLite bytes.
 
+Current source verifies this registered Store with a Store-first sequence:
+same-directory rebuild, source-aware `audit-store`, and Store-only `digest-store`.
+The digest path reconstructs one Canonical chart at a time and can compare explicit
+historical counts/digests without generating the former 14 GiB expanded JSON tree.
+This does not broaden the fingerprint table or the M7 semantic claim.
+
 For the second fingerprint the extractor observed 5,193 files, 5,069 UnityFS
 bundles, and 2,305 StageInfo charts in 725 sources. It resolved and exported
 2,304 charts while preserving `tutorial_v2_map1` as the same explicit
@@ -56,7 +62,8 @@ grouping census require the explicit `--allow-unsupported-research` opt-in;
 their output is diagnostic-only and must not be treated as proof that the
 known parser applies. After candidates, index, and a complete grouping census
 agree on the same fingerprint, `extract-all --allow-unsupported-research` may
-produce a nonformal M8 evidence run. Its manifest contains
+produce a nonformal M8 evidence run only together with the separate
+`--allow-expanded-json` large-output opt-in. Its manifest contains
 `profile_support.formal_support=false`; the flag never edits the registry or
 turns that run into formal support. Compare the resulting structure, document
 counterexamples, independently audit the full batch, and only then register a

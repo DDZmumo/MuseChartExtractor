@@ -80,6 +80,24 @@ The retained real validation references currently contain aggregate combo counts
 only. Event-reference support is therefore implemented and synthetic-tested, but it
 does not retroactively advance the project's M7 evidence claim.
 
+## Store-only Canonical digest is not semantic validation
+
+`digest-store` is the default full-library Canonical reconstruction check. It opens a
+Compact Store fail-closed, loads one resolved chart at a time, serializes with the same
+stable encoder and length-framed digest used by historical Store/JSON equivalence, and
+then releases the chart. It does not write expanded chart files or retain a corpus
+cache.
+
+The report may prove that Store payloads, parser/schema versions, chart ID sets,
+resolved raw/event/sentinel counts, semantic byte count, and Canonical corpus digest
+match an explicit baseline. This is storage/reconstruction equivalence. It is not an
+independent event source and cannot change any `event-reference-v1` category from
+`not_compared` to `compared`.
+
+Full-library M7 remains partial until legally obtained, provenance-bearing independent
+event streams cover the fields being claimed. A digest match, Store audit, or
+deterministic rebuild must never be reported as timing/type/lane/duration ground truth.
+
 For a complete schema `1.1.0` batch, `tools/audit_extracted_batch.py`
 independently reopens every successful file. It checks the manifest path,
 size, and SHA-256; the single raw-table layout; raw index uniqueness; gameplay

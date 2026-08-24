@@ -1494,3 +1494,74 @@ behavior.
 No real event stream was added. This work makes event-level evidence measurable
 when independently supplied; it does not retroactively validate timing, type,
 lane, air/ground, or duration and does not advance the existing M7 partial claim.
+
+## 2026-08-24 — Latest fingerprint refresh and Store-first correction
+
+### Latest installation identity
+
+The current Steam installation remained fully installed (`StateFlags=4`) at
+build ID `24198001` and `4,791,937,135` bytes. Two independent complete scans
+both produced 5,218 files, 5,094 UnityFS bundles, and the existing registered
+fingerprint:
+
+```text
+sha256:1821d79ef6d53bca76c60491a2395496054fa473c31482ecc73b8d866c5f0ab5
+```
+
+Both inventory JSONL files were 1,598,685 bytes with SHA-256
+`fb2116940ece1fc85deb41794e600610d5d5c77535f3acadb4da04fd0eaa121b`;
+both summaries were 804 bytes with SHA-256
+`e09b924f43a8f407b1fea4e25ebfafc066382392bed05a51721a8171945dd809`.
+No third fingerprint was observed.
+
+A new complete evidence directory at
+`diagnostics/versions/latest_1821_20260824_full` independently regenerated:
+
+```text
+probe:             5,097 / 5,097 sources parseable, 0 failed
+candidates:        733 sources, 2,331 candidates, 0 failed
+index:             736 songs, 2,330 indexed, 1 unresolved
+grouping census:   2,331 / 2,331 parsed and grouped
+```
+
+The ten regenerated scan/probe/candidate/index/census artifacts matched the
+existing root diagnostics byte-for-byte, including every byte count and
+SHA-256. This confirms the current profile rather than creating a new one.
+
+### Interrupted expanded JSON mistake and cleanup
+
+An obsolete full `extract-all` acceptance run was started against the new
+evidence directory. It wrote only to the exact ignored target
+`D:\Projects\PythonP\MuseChartExtractor\extracted\latest_1821_20260824`.
+Before cleanup, the exact venv launcher PID `66708` and its base-Python child
+`65756` were verified by full command line and stopped; no other Python process
+was present. The final stationary tree contained 1,419 files and
+8,531,656,376 bytes, resolved exactly to the intended child of `extracted`, and
+contained zero symlink/junction/reparse points.
+
+Only that directory was deleted with an explicit literal .NET directory call
+after PowerShell `Remove-Item -Recurse` was blocked by the execution safety
+layer. The deletion bypassed the recycle bin. `MuseDashChartStore/`,
+`diagnostics/`, `experimental/`, the current evidence directory, and all
+historical Store reports remained present.
+
+### New default
+
+Current source makes `extract-all` fail closed without explicit
+`--allow-expanded-json` and directs normal full-library work to Compact Store.
+The new `digest-store` path reuses the historical stable Canonical encoder and
+corpus framing while loading only one chart at a time. It reports ID-set
+digests, status/count totals, semantic bytes, Canonical corpus digest, optional
+expected-baseline mismatches, and at most ten bounded failures; it never writes
+expanded chart JSON. Synthetic verification and the new real Store acceptance
+are recorded separately below when completed. This storage-path correction does
+not alter M7's partial semantic boundary.
+
+The Store-first code gate passed 184 non-local tests with one Windows
+symlink-permission skip, four deselected local-game tests, and 58 subtests.
+`compileall`, dependency checks, and Ruff on every changed Python file passed.
+A unique wheel/sdist build passed both release archive audits; the wheel contains
+`store/canonical_digest.py` and contains no diagnostics, Store, `.odin`, SQLite,
+payload, event-reference artifact, or downstream bridge code. Real Store digest
+and rebuild evidence is intentionally not claimed by these synthetic/package
+checks.

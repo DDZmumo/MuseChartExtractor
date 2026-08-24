@@ -80,13 +80,17 @@ musedash-chart-extractor audit-store `
   --store MuseDashChartStore `
   --game-dir $GameDir `
   --report diagnostics/store_audit.json
+musedash-chart-extractor digest-store `
+  --store MuseDashChartStore `
+  --report diagnostics/store_canonical_digest.json
 ```
 
 结果以原始 Odin payload + SQLite 通用索引写入 `MuseDashChartStore/`，最后原子写入
 `store.json`。最新 fingerprint 的完整 Store 约 1.026 GiB，是迁移前 13.121 GiB 展开 JSON
 树的 7.8189%；本地旧树在全量审计和逐图等价通过后已清理。JSON/CSV 仍可通过
-`ChartStore.load_chart()` 按单图导出；需要兼容旧流程时
-仍可显式运行 `extract-all --output extracted`，但不建议把展开 JSON 当作长期数据库。
+`ChartStore.load_chart()` 按单图导出。旧的全库 JSON 流程只保留作显式兼容/研究入口，必须
+额外传入 `extract-all --allow-expanded-json`；它可能生成约 14 GiB，不是默认数据库或 Store
+验收路径。
 
 > [!IMPORTANT]
 > `MuseDashChartStore/` 和 `extracted/` 含用户本机官方衍生数据，已被 Git 忽略。请勿提交、发布或再分发完整谱面、
@@ -105,6 +109,7 @@ musedash-chart-extractor audit-store `
 - **歌曲与难度索引**：从 Addressables、StageInfo 与 ALBUM 配置恢复稳定 song/chart 关系。
 - **Canonical Chart schema 1.1**：单一 raw-record table，event 仅通过原始 index 引用。
 - **Compact Store schema 1.0**：原始 Odin bytes 内容寻址，SQLite 只保存共享索引，单图懒解析。
+- **Store-only Canonical digest**：逐张懒加载并复用历史稳定 encoder/framing，不写全库 JSON 即可核对 corpus digest、ID sets 与 raw/event/sentinel counts。
 - **未知信息保真**：未知字段与未知 type 不会被删除或强行映射。
 - **验证与独立审计**：检查来源 SHA、Decimal、事件结构、raw index 闭包与全量文件 manifest；可选完整索引事件参考会按明确提供的 time/type/lane/duration 字段生成差异报告。
 - **通用输出接口**：内置 JSON、CSV 与 Python API，不绑定 MusePlay、YOLO 或 AutoPlay。

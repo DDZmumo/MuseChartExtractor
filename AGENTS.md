@@ -23,6 +23,15 @@ These instructions apply to the whole repository.
 - M7 remains partial: structural/source/aggregate checks are not full event-level timing, type, lane, air/ground, or duration ground truth. `is_air` remains uninterpreted and `tutorial_v2_map1` remains unresolved/uncertain.
 - Do not advance semantic accuracy, compatibility, or milestone claims from code presence, tests, matching counts, or storage equivalence alone.
 
+## Store-first output and acceptance policy
+
+- Compact Store is the default long-term format and the default full-library acceptance format. Do not generate an expanded Canonical JSON corpus for routine Store verification.
+- The normal full-library sequence is `extract-store` -> source-aware `audit-store` -> Store-only `digest-store` -> a second same-directory Store rebuild -> audit/digest/determinism comparison.
+- `extract-all` is a legacy compatibility and explicit research command. It must fail closed unless the caller supplies `--allow-expanded-json`, and its warning must state the approximate 14 GiB output risk, Store-first alternative, and official-derived redistribution boundary.
+- JSON/CSV export is normally limited to one chart or an explicitly requested small set through `ChartStore.load_chart()` and neutral exporters.
+- Generate a full Canonical JSON tree only after the user explicitly approves it and a concrete independent need cannot be covered by Store audit, Store-only Canonical digest, or Store-to-Store comparison.
+- `digest-store` must reuse the same stable Canonical encoder and corpus framing as historical equivalence, load only one resolved chart at a time, retain no unbounded corpus cache, and emit metadata/hashes/counts plus at most 10 bounded failures. It must never write chart JSON or payload bytes.
+
 ## Repository ownership
 
 - `src/musedash_chart_extractor/scanner.py`: deterministic inventory and installation fingerprint.
@@ -30,6 +39,7 @@ These instructions apply to the whole repository.
 - `src/musedash_chart_extractor/discovery/`: candidates, structure recovery, grouping census, note data, and song/chart indexing.
 - `src/musedash_chart_extractor/charts/`: Canonical models, lossless projection, and validation.
 - `src/musedash_chart_extractor/store/`: Store schema, writer, lazy reader, independent audit, and streaming equivalence.
+- `src/musedash_chart_extractor/store/canonical_digest.py`: Store-only, one-chart-at-a-time Canonical corpus digest and expected-baseline verification; no expanded chart output.
 - `src/musedash_chart_extractor/installation.py`: supported-fingerprint gate and public facade. Unknown fingerprints remain probe-only unless an explicit research command and all evidence gates permit more.
 - `src/musedash_chart_extractor/exporters/`: neutral JSON/CSV interfaces. Do not add downstream-specific exporters.
 - `tests/`: synthetic fixtures and regression coverage. `local_game` tests require a user-owned installation and never run in CI.

@@ -272,7 +272,7 @@ def _read_legacy_chart(
     return chart
 
 
-def _update_corpus_digest(
+def update_canonical_corpus_digest(
     digest: Any, chart_id: str, canonical_json: bytes
 ) -> None:
     chart_id_bytes = chart_id.encode("utf-8")
@@ -282,7 +282,7 @@ def _update_corpus_digest(
     digest.update(canonical_json)
 
 
-def _canonical_counts(chart: Mapping[str, Any]) -> tuple[int, int]:
+def canonical_chart_counts(chart: Mapping[str, Any]) -> tuple[int, int]:
     raw = chart.get("raw_record_count")
     if not _integer(raw):
         raw_evidence = chart.get("raw")
@@ -539,12 +539,12 @@ def compare_chart_store_to_canonical_tree(
                 )
                 if legacy_chart is not None:
                     legacy_json = stable_json(legacy_chart).encode("utf-8")
-                    _update_corpus_digest(legacy_digest, chart_id, legacy_json)
+                    update_canonical_corpus_digest(legacy_digest, chart_id, legacy_json)
                     report["comparison"]["legacy_loaded_chart_count"] += 1
                     report["comparison"]["legacy_semantic_byte_count"] += len(
                         legacy_json
                     )
-                    raw_count, event_count = _canonical_counts(legacy_chart)
+                    raw_count, event_count = canonical_chart_counts(legacy_chart)
                     legacy_row = legacy_by_id[chart_id]
                     if (
                         legacy_row.get("raw_record_count") != raw_count
@@ -578,12 +578,12 @@ def compare_chart_store_to_canonical_tree(
                         store_chart = loaded
                         del loaded
                         store_json = stable_json(store_chart).encode("utf-8")
-                        _update_corpus_digest(store_digest, chart_id, store_json)
+                        update_canonical_corpus_digest(store_digest, chart_id, store_json)
                         report["comparison"]["store_loaded_chart_count"] += 1
                         report["comparison"]["store_semantic_byte_count"] += len(
                             store_json
                         )
-                        raw_count, event_count = _canonical_counts(store_chart)
+                        raw_count, event_count = canonical_chart_counts(store_chart)
                         store_ref = store_by_id[chart_id]
                         if (
                             getattr(store_ref, "raw_record_count", raw_count) != raw_count
@@ -626,5 +626,7 @@ def compare_chart_store_to_canonical_tree(
 __all__ = [
     "DEFAULT_MISMATCH_SAMPLE_LIMIT",
     "EQUIVALENCE_REPORT_SCHEMA_VERSION",
+    "canonical_chart_counts",
     "compare_chart_store_to_canonical_tree",
+    "update_canonical_corpus_digest",
 ]

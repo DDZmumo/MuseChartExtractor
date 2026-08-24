@@ -23,6 +23,10 @@ Linux and macOS contributors can use the corresponding `bin/python` path.
 - Unknown tags, fields, types, and versions must fail loudly or remain explicit.
 - Keep game access read-only. Runtime hooks, mods, injection, and memory reads
   are outside project scope.
+- Keep full-library work Store-first. Do not run `extract-all` as a routine
+  validation step; it requires explicit `--allow-expanded-json` because it can
+  materialize about 14 GiB of official-derived JSON. Prefer Store rebuild,
+  source-aware audit, and Store-only `digest-store`.
 
 ## Tests and fixtures
 
@@ -46,6 +50,12 @@ Before opening a change, run:
 .\.venv\Scripts\python.exe -m build
 .\.venv\Scripts\python.exe tools/audit_release_archives.py dist/*
 ```
+
+For Store changes, also run targeted synthetic Store tests. Real full-library
+acceptance should reuse one `MuseDashChartStore/` directory, then run
+`audit-store` and `digest-store` to unique metadata-only reports before and after
+a second rebuild. Do not create an expanded Canonical corpus unless the user has
+approved a specific independent need that Store streaming cannot cover.
 
 Inspect wheel and sdist contents. They must not contain `diagnostics/`,
 `experimental/`, `extracted/`, `exports/`, or any game-derived event data.

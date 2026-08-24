@@ -1189,8 +1189,13 @@ diagnostics/validation_report.md
 ```bash
 musedash-chart-extractor extract-all \
   --game-dir "..." \
+  --allow-expanded-json \
   --output extracted
 ```
+
+`extract-all` 只保留为旧兼容或显式研究命令。默认调用必须 fail closed，并提示可能产生约
+14 GiB 官方衍生 JSON、推荐使用 Compact Store，以及不得提交/再分发；只有用户明确批准并
+传入 `--allow-expanded-json` 后才执行。常规全库验收不得生成该树。
 
 ---
 
@@ -1461,6 +1466,13 @@ MuseDashChartStore/
 JSON/CSV 仍是按需 Exporter，不再是默认数据库格式。核心继续保持通用；依赖方向只能是
 下游项目调用 `MuseDashChartExtractor`，Store API 不包含 MusePlay、YOLO 或 AutoPlay
 适配器。
+
+Store 的默认完整验收也不得依赖展开 JSON。使用 `digest-store` 每次只
+`load_chart(chart_id)` 一张 resolved chart，复用历史 equivalence 的 stable encoder 与
+length-framed corpus SHA-256，累计 resolved ID set、raw/event/sentinel counts 和 semantic
+bytes；随后释放对象。source-aware audit、两轮同目录 Store 重建和 Store-only digest 共同
+替代日常的 Store-to-expanded-tree 验收。只有存在这些流式检查无法覆盖的独立需求并得到用户
+明确批准时，才允许生成全库 Canonical JSON。
 
 ## 必做任务
 
@@ -1878,6 +1890,11 @@ Addressables 只额外提供资源 hash key，IL2CPP metadata 中的相关字符
 `song_id = ALBUM uid` 契约的 song identity。该 chart 继续保持 `unresolved/uncertain`；下一步
 需要找到教程配置到正式 identity 的静态字段关系或其他独立官方 metadata，不能用文件名
 编造 song ID。
+
+从 2026-08-24 起，完整维护流程改为 Store-first：`extract-all` 默认拒绝全库展开 JSON，
+Store 验收使用两轮原目录 `extract-store`、source-aware `audit-store`、Store-only
+`digest-store` 和 metadata-only determinism report。该变化只减少空间与重复持久化，不把
+Store/Canonical digest 等价解释为新的游戏语义证据。
 
 ---
 

@@ -48,7 +48,7 @@ $env:PYTHONPATH = (Resolve-Path src).Path
 python -m musedash_chart_extractor --help
 ```
 
-## 完整批量提取流程
+## 完整 Store-first 提取流程
 
 对正式支持的 fingerprint，按顺序运行：
 
@@ -58,28 +58,28 @@ musedash-chart-extractor probe --game-dir $GameDir --output-dir $Diagnostics
 musedash-chart-extractor candidates --game-dir $GameDir --output-dir $Diagnostics
 musedash-chart-extractor index --game-dir $GameDir --output "$Diagnostics/song_chart_index.json"
 musedash-chart-extractor grouping-census --game-dir $GameDir --output-dir $Diagnostics
-musedash-chart-extractor extract-all --game-dir $GameDir --output extracted
-```
-
-`extract-all` 会重新计算安装 fingerprint，并要求 candidates、song index、bundle inventory
-和 grouping census 属于完全相同的资源集。manifest 最后原子写入；失败或 uncertain 都是显式
-结果，不会被静默跳过。
-
-长期保存推荐改用 Compact Store，而不是保留展开 JSON：
-
-```powershell
 musedash-chart-extractor extract-store `
   --game-dir $GameDir `
-  --output MuseDashChartStore
+  --output MuseDashChartStore `
+  --candidate-file "$Diagnostics/chart_candidates.jsonl" `
+  --song-index "$Diagnostics/song_chart_index.json" `
+  --bundle-inventory "$Diagnostics/bundle_inventory.jsonl" `
+  --grouping-census-summary "$Diagnostics/grouping_census_summary.json"
 
 musedash-chart-extractor audit-store `
   --store MuseDashChartStore `
   --game-dir $GameDir `
   --report "$Diagnostics/store_audit.json"
+
+musedash-chart-extractor digest-store `
+  --store MuseDashChartStore `
+  --report "$Diagnostics/store_canonical_digest.json"
 ```
 
 `extract-store` 复用同一 candidates/index/inventory/census 门禁，但没有
 `--allow-unsupported-research`；它只接受源码注册的正式 fingerprint。
+`digest-store` 每次只懒加载一张 resolved chart，复用历史稳定 Canonical encoder/framing，
+只写 metadata、hash、count 和 bounded failure，不生成全库 JSON。
 
 ## scan - 资源 Inventory
 
@@ -279,8 +279,13 @@ census 对每个 candidate 严格解析并分组，但不导出完整事件。�
 ```powershell
 musedash-chart-extractor extract-all `
   --game-dir $GameDir `
+  --allow-expanded-json `
   --output extracted
 ```
+
+该命令不是默认全库路径。省略 `--allow-expanded-json` 时会在读取提取输入和创建输出树前
+fail closed，并提示约 14 GiB 空间风险、Compact Store 替代路径和官方衍生数据边界。只有
+用户明确批准且 Store 流式验收无法覆盖具体需求时才应使用。
 
 输出结构：
 
@@ -297,8 +302,8 @@ manifest 分类每个 candidate 的 `success`、`failed` 或 `uncertain`，并�
 2,330 success、1 uncertain、0 failed；manifest 总 logical events 为 1,204,898，其中正式
 文件导出 1,204,824 events。
 
-当前 2,330 个文件约 13.1 GiB。相同版本的重复验证应复用同一输出目录原地运行；manifest
-包含逐文件路径、大小和 SHA-256，可在不保留双份文件树的情况下证明确定性。
+历史 2,330 个文件约 13.1 GiB。该兼容输出仍具有 manifest 与逐文件 SHA，但不再作为
+Store 重建、等价或确定性的常规验收手段。
 
 ## extract-store - Compact Odin Store
 
@@ -368,7 +373,35 @@ payload 和 StageInfo envelope。无论是否提供，审计器都会独立执�
 14,088,644,042-byte JSON 基线的 7.8189%。2,331 个 payload 总计 1,053,670,885
 bytes；2,330 success、1 uncertain、0 failed。完整审计 13 类 mismatch 均为 0。
 
-## 独立批量审计
+## digest-store - Store-only Canonical corpus digest
+
+```powershell
+musedash-chart-extractor digest-store `
+  --store MuseDashChartStore `
+  --report "$Diagnostics/store_canonical_digest.json" `
+  --expected-inventory-fingerprint "sha256:<64-hex>" `
+  --expected-corpus-digest "<64-hex>" `
+  --expected-chart-count 2330 `
+  --expected-raw-record-count 1817952 `
+  --expected-event-count 1204824 `
+  --expected-sentinel-count 991 `
+  --expected-semantic-byte-count 14086035191
+```
+
+命令先通过 `ChartStore.open()` fail-closed 核对 manifest、SQLite SHA、integrity/FK、metadata
+版本和 logical Store digest，再按稳定 chart ID 顺序每次只 `load_chart()` 一张。Canonical
+对象用 `store/equivalence.py` 相同的 `stable_json` 与 length-framed corpus digest 更新后立即
+释放；不会创建 chart JSON、全库 cache 或第二份 payload。
+
+报告只包含 Store/Canonical schema、fingerprint、status counts、resolved/uncertain/failed
+ID-set digest、resolved chart/raw/event/sentinel counts、semantic bytes、corpus digest、expected
+baseline 和最多 10 条 bounded failures。任一 payload、song join、parser/schema、manifest count
+或 expected baseline 不匹配均返回 1；输入/Store 错误返回 2。报告必须写在 Store 外。
+
+省略 expected 参数时命令仍执行完整 Store-only digest，但不把结果解释为对历史 baseline 的
+匹配。该 digest 证明当前 Store 可以稳定重建相同 Canonical bytes，不证明游戏语义 100% 正确。
+
+## 旧 expanded JSON 独立批量审计
 
 该工具仅位于当前 `main`（Unreleased）的源码仓库中，`v0.1.0` 不包含它。请在仓库根目录运行：
 
@@ -397,7 +430,8 @@ counts、status aggregates 和唯一 chart IDs，并重新打开每个 successfu
 `UnknownGameVersionError`，而不是静默复用已知 parser。
 
 `v0.1.0` 只为部分研究命令提供 opt-in；未知 fingerprint 的完整
-`extract-all --allow-unsupported-research` 流程仅适用于当前 `main`（Unreleased）。
+`extract-all --allow-expanded-json --allow-unsupported-research` 流程仅适用于当前 `main`
+（Unreleased），且仍会产生大型官方衍生 JSON。
 
 确需继续研究时，`candidates`、`inspect-stageinfo`、`extract`、`index`、
 `grouping-census` 和 `extract-all` 提供显式 `--allow-unsupported-research`。这不会降低

@@ -8,6 +8,9 @@ separately.
 
 ### Added
 
+- Add `digest-store`, a Store-only one-chart-at-a-time Canonical corpus digest
+  with stable historical framing, ID-set/count reporting, bounded failures, and
+  optional expected-baseline checks without expanded chart files.
 - Add optional `event-reference-v1` validation input for complete indexed event
   streams. It compares exact time/type/lane/duration fields without greedy
   alignment, reports bounded per-category differences, and leaves omitted
@@ -23,6 +26,9 @@ separately.
 
 ### Changed
 
+- Make Compact Store the default full-library acceptance path. `extract-all`
+  now requires explicit `--allow-expanded-json` and warns about the approximate
+  14 GiB output, Store alternative, and official-derived data boundary.
 - Rework the README into a release-oriented project overview and move the
   complete evidence-gated command workflow to `docs/cli-reference.md`.
 - Record the completed `v0.1.0` CI/release evidence and direct GitHub wheel

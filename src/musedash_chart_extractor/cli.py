@@ -301,6 +301,14 @@ def _build_parser() -> argparse.ArgumentParser:
         default=50,
         help="emit progress after this many bundles (default: 50; 0 disables)",
     )
+    extract_all.add_argument(
+        "--allow-expanded-json",
+        action="store_true",
+        help=(
+            "explicitly permit the legacy full Canonical JSON tree, which may "
+            "produce about 14 GiB; Compact Store is the recommended default"
+        ),
+    )
     _add_unsupported_research_override(extract_all)
 
     extract_store = commands.add_parser(
@@ -356,6 +364,38 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("diagnostics/store_audit.json"),
     )
+
+    digest_store = commands.add_parser(
+        "digest-store",
+        help="stream one Canonical chart at a time from a Store into a corpus digest",
+    )
+    digest_store.add_argument("--store", required=True, type=Path)
+    digest_store.add_argument(
+        "--report",
+        type=Path,
+        default=Path("diagnostics/store_canonical_digest.json"),
+    )
+    digest_store.add_argument(
+        "--progress-every",
+        type=int,
+        default=50,
+        help="emit progress after this many resolved charts (default: 50; 0 disables)",
+    )
+    digest_store.add_argument(
+        "--failure-sample-limit",
+        type=int,
+        default=10,
+        help="retain at most this many bounded failure samples (default: 10)",
+    )
+    digest_store.add_argument("--expected-inventory-fingerprint")
+    digest_store.add_argument("--expected-corpus-digest")
+    digest_store.add_argument("--expected-resolved-id-set-digest")
+    digest_store.add_argument("--expected-uncertain-id-set-digest")
+    digest_store.add_argument("--expected-chart-count", type=int)
+    digest_store.add_argument("--expected-raw-record-count", type=int)
+    digest_store.add_argument("--expected-event-count", type=int)
+    digest_store.add_argument("--expected-sentinel-count", type=int)
+    digest_store.add_argument("--expected-semantic-byte-count", type=int)
     return parser
 
 
@@ -999,6 +1039,14 @@ def _run_extract_all(
     from .installation import MuseDashInstallation
 
     game_dir = validate_game_directory(arguments.game_dir)
+    if not arguments.allow_expanded_json:
+        raise ScannerError(
+            "expanded Canonical JSON export is disabled by default because it may "
+            "produce about 14 GiB; use extract-store for the recommended Compact "
+            "Store workflow. Full JSON is official-derived local data and must not "
+            "be committed or redistributed. Pass --allow-expanded-json only for an "
+            "explicit legacy or research need."
+        )
     if path_is_link(arguments.output.expanduser()):
         raise ScannerError(
             f"batch output must not be a symbolic link or junction: {arguments.output}"
@@ -1172,6 +1220,91 @@ def _run_audit_store(arguments: argparse.Namespace, stdout: TextIO) -> int:
     return 0 if report["status"] == "passed" else 1
 
 
+def _run_digest_store(
+    arguments: argparse.Namespace,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    from .store.canonical_digest import digest_chart_store
+
+    requested_store = arguments.store.expanduser()
+    if path_is_link(requested_store):
+        raise ScannerError(
+            f"store root must not be a symbolic link or junction: {requested_store}"
+        )
+    store_dir = requested_store.resolve(strict=False)
+    requested_report = arguments.report.expanduser()
+    if path_is_link(requested_report):
+        raise ScannerError(
+            f"digest report must not be a symbolic link or junction: {requested_report}"
+        )
+    report_path = requested_report.resolve()
+    if _path_is_within(report_path, store_dir):
+        raise ScannerError(
+            "Store-only Canonical digest report must be written outside the Store"
+        )
+    if arguments.progress_every < 0:
+        raise ScannerError("progress interval cannot be negative")
+    if arguments.failure_sample_limit < 0:
+        raise ScannerError("failure sample limit cannot be negative")
+
+    expected = {
+        key: value
+        for key, value in {
+            "inventory_fingerprint": arguments.expected_inventory_fingerprint,
+            "canonical_corpus_digest": arguments.expected_corpus_digest,
+            "resolved_id_set_digest": arguments.expected_resolved_id_set_digest,
+            "uncertain_id_set_digest": arguments.expected_uncertain_id_set_digest,
+            "resolved_chart_count": arguments.expected_chart_count,
+            "resolved_raw_record_count": arguments.expected_raw_record_count,
+            "resolved_event_count": arguments.expected_event_count,
+            "resolved_sentinel_count": arguments.expected_sentinel_count,
+            "semantic_byte_count": arguments.expected_semantic_byte_count,
+        }.items()
+        if value is not None
+    }
+
+    def progress(current: int, total: int, chart_id: str) -> None:
+        every = arguments.progress_every
+        if every > 0 and (current % every == 0 or current == total):
+            print(
+                f"digest store: {current}/{total} charts ({chart_id})",
+                file=stderr,
+            )
+
+    try:
+        report = digest_chart_store(
+            store_dir,
+            expected=expected,
+            failure_sample_limit=arguments.failure_sample_limit,
+            progress=progress,
+        )
+    except ValueError as exc:
+        raise ScannerError(str(exc)) from exc
+    destination = write_json(report_path, report)
+    canonical = report["canonical"]
+    print(
+        json.dumps(
+            {
+                "status": report["status"],
+                "resolved_chart_count": canonical["resolved_chart_count"],
+                "raw_record_count": canonical["raw_record_count"],
+                "logical_event_count": canonical["logical_event_count"],
+                "sentinel_count": canonical["sentinel_count"],
+                "semantic_byte_count": canonical["semantic_byte_count"],
+                "canonical_corpus_digest": canonical["corpus_digest"],
+                "uncertain_count": report["id_sets"]["uncertain"]["count"],
+                "mismatch_count": report["mismatch_count"],
+                "digest_report": str(destination.resolve()),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
+        file=stdout,
+    )
+    return 0 if report["status"] == "passed" else 1
+
+
 def run(
     argv: Sequence[str] | None = None,
     *,
@@ -1211,6 +1344,8 @@ def run(
             return _run_extract_store(arguments, output, errors)
         if arguments.command == "audit-store":
             return _run_audit_store(arguments, output)
+        if arguments.command == "digest-store":
+            return _run_digest_store(arguments, output, errors)
     except (ScannerError, OSError) as exc:
         print(f"error: {exc}", file=errors)
         return 2
