@@ -1,7 +1,8 @@
 # CLI Reference
 
 本文档记录 MuseDashChartExtractor 的完整本地工作流。所有游戏资源访问均为只读；
-`diagnostics/`、`experimental/`、`extracted/` 和 `exports/` 是本地输出，不得提交或再分发。
+`diagnostics/`、`experimental/`、`extracted/`、`exports/` 和
+`MuseDashChartStore/` 是本地输出，不得提交或再分发。
 
 ## 准备环境
 
@@ -63,6 +64,22 @@ musedash-chart-extractor extract-all --game-dir $GameDir --output extracted
 `extract-all` 会重新计算安装 fingerprint，并要求 candidates、song index、bundle inventory
 和 grouping census 属于完全相同的资源集。manifest 最后原子写入；失败或 uncertain 都是显式
 结果，不会被静默跳过。
+
+长期保存推荐改用 Compact Store，而不是保留展开 JSON：
+
+```powershell
+musedash-chart-extractor extract-store `
+  --game-dir $GameDir `
+  --output MuseDashChartStore
+
+musedash-chart-extractor audit-store `
+  --store MuseDashChartStore `
+  --game-dir $GameDir `
+  --report "$Diagnostics/store_audit.json"
+```
+
+`extract-store` 复用同一 candidates/index/inventory/census 门禁，但没有
+`--allow-unsupported-research`；它只接受源码注册的正式 fingerprint。
 
 ## scan - 资源 Inventory
 
@@ -258,6 +275,74 @@ manifest 分类每个 candidate 的 `success`、`failed` 或 `uncertain`，并�
 当前 2,330 个文件约 13.1 GiB。相同版本的重复验证应复用同一输出目录原地运行；manifest
 包含逐文件路径、大小和 SHA-256，可在不保留双份文件树的情况下证明确定性。
 
+## extract-store - Compact Odin Store
+
+```powershell
+musedash-chart-extractor extract-store `
+  --game-dir $GameDir `
+  --output MuseDashChartStore `
+  --candidate-file "$Diagnostics/chart_candidates.jsonl" `
+  --song-index "$Diagnostics/song_chart_index.json" `
+  --bundle-inventory "$Diagnostics/bundle_inventory.jsonl" `
+  --grouping-census-summary "$Diagnostics/grouping_census_summary.json"
+```
+
+输出：
+
+```text
+MuseDashChartStore/
+├── store.json
+├── index.sqlite3
+├── payloads/
+│   └── sha256/<first-two-hex>/<full-sha256>.odin
+└── audit/
+    └── store_audit.json  # audit-store 生成；也可写到 diagnostics
+```
+
+每个 `.odin` 逐字节等于 StageInfo 的原始 `SerializedBytes`。文件名使用 payload
+SHA-256，重复内容只保存一次；SQLite 不保存 BLOB。writer 会：
+
+- 重新计算并要求正式支持的完整 installation fingerprint；
+- 要求 candidate、song index、bundle inventory 和完整 grouping census 同属该 fingerprint；
+- 核对 bundle、PathID、对象类型、payload size/SHA；
+- 对每个 payload 严格解析到 EOF，并重算 grouping counts；
+- 完整保留去掉 `SerializedBytes` 后的 StageInfo envelope；
+- 将全局 notedata 保存一次，chart 只保存 UID 引用；
+- 显式记录每个 success、uncertain 或 failed candidate；
+- 使用 `.building`、临时文件和 SQLite 事务，清理前拒绝 `.staging` 内任何 symlink/junction，
+  并最后原子发布 `store.json`。
+
+同一目录重跑会逐个验证并复用已存在的内容寻址 payload，不创建第二份 Store。stale 或
+extra payload 不会被自动隐藏；writer 拒绝发布不完整结果，`audit-store` 也会将其报告为失败。
+
+## audit-store - 独立 Store 审计
+
+```powershell
+musedash-chart-extractor audit-store `
+  --store MuseDashChartStore `
+  --game-dir $GameDir `
+  --report "$Diagnostics/store_audit.json"
+```
+
+`--game-dir` 可省略；提供时会额外重新校验 source bundle SHA、PathID、对象类型、原始
+payload 和 StageInfo envelope。无论是否提供，审计器都会独立执行：
+
+- `PRAGMA integrity_check` 和 `foreign_key_check`；
+- manifest、SQLite metadata、logical digest、candidate/chart/source/payload ID 集合；
+- payload exact file set、规范路径、symlink、size 与 SHA-256；
+- 每个 Odin stream 的严格 EOF parse；
+- StageInfo 不重复保存 `SerializedBytes`，且保留 `SerializedFormat`、`sceneEvents`；
+- raw record、record group、logical event、sentinel counts 的重新计算。
+
+报告只包含 metadata、hash、count 和最多 10 条 mismatch 摘要，不包含事件或 payload。
+命令在零 mismatch 时返回 0，审计不通过时返回 1，输入/IO/domain 错误返回 2。
+报告可以写到 Store 外的 diagnostics；若写在 Store 内，则只能位于 `audit/`，不能覆盖
+`store.json`、`index.sqlite3`、payload 或构建暂存路径。
+
+当前 fingerprint 的实盘 Store 为 1,101,577,861 bytes（含审计报告），是迁移前
+14,088,644,042-byte JSON 基线的 7.8189%。2,331 个 payload 总计 1,053,670,885
+bytes；2,330 success、1 uncertain、0 failed。完整审计 13 类 mismatch 均为 0。
+
 ## 独立批量审计
 
 该工具仅位于当前 `main`（Unreleased）的源码仓库中，`v0.1.0` 不包含它。请在仓库根目录运行：
@@ -309,20 +394,22 @@ manifest 会写入：
 ## Python API
 
 ```python
-from musedash_chart_extractor import CsvExporter, JsonExporter, MuseDashInstallation
+from musedash_chart_extractor import ChartStore, CsvExporter, JsonExporter
 
-game = MuseDashInstallation.open(r"D:\SteamLibrary\steamapps\common\Muse Dash")
-charts = game.extract_charts(
-    output_dir="extracted",
-    diagnostics_dir="diagnostics",
-)
+with ChartStore.open("MuseDashChartStore") as store:
+    refs = list(store.iter_charts())
+    chart = store.load_chart("urban_magic_map3")
 
-for chart in charts:
-    JsonExporter(indent=None).export(chart, f"exports/{chart['chart_id']}.json")
-    CsvExporter().export(chart, f"exports/{chart['chart_id']}.csv")
+JsonExporter(indent=None).export(chart, "exports/urban_magic_map3.json")
+CsvExporter().export(chart, "exports/urban_magic_map3.csv")
 ```
 
-`extract_charts()` 是对已完成 diagnostics 门禁的公共 facade，不会替用户跳过前置调查。
+`iter_charts()` 只读 SQLite metadata，不解析全部 payload；`read_payload(chart_id)` 返回经过
+size/SHA 校验的原始 bytes；`load_chart(chart_id)` 才解析一张 Odin stream、连接共享
+note config/song index 并生成 Canonical `1.1.0`。没有无界缓存。
+
+`MuseDashInstallation.extract_store()` 是 CLI 的正式 fingerprint-gated facade；旧的
+`extract_charts()` 仍可按需生成完整 JSON 树，但不再是推荐的长期数据库格式。
 `JsonExporter` 保留完整 model；`CsvExporter` 是扁平事件视图，不替代内部 raw/unknown 数据。
 
 ## 本地测试

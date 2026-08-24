@@ -7,7 +7,7 @@ string or Steam build ID alone.
 
 | Inventory fingerprint | Addressables | Build result hash | Status |
 |---|---|---|---|
-| `sha256:1821d79ef6d53bca76c60491a2395496054fa473c31482ecc73b8d866c5f0ab5` | `1.21.20` | `9ecc2d74a4045582f2aabf0f64c83581` | M8 achieved on one local installation |
+| `sha256:1821d79ef6d53bca76c60491a2395496054fa473c31482ecc73b8d866c5f0ab5` | `1.21.20` | `9ecc2d74a4045582f2aabf0f64c83581` | M10 Compact Store achieved on one local installation |
 | `sha256:d9108183177ac7c4821b466d28e0920d8a4a9bcd490a0edde956be3681233222` | `1.21.20` | `f4759f2e039525793e62c59c15df44c6` | M8 achieved on Steam depot manifest `241392741196033182` |
 
 For the first fingerprint the extractor observed 5,218 files, 5,094 UnityFS
@@ -18,6 +18,10 @@ Canonical schema `1.0.0` batch runs produced identical manifests. Schema
 manifests. The first run passed the 15-category per-file
 hash/layout/group/reference/raw-accounting audit; the second passed its
 16-category fail-closed superset, which also recomputes manifest integrity.
+The same resources now also have a complete physical Store `1.0.0`: all 2,331
+payloads are retained, independent Store audit reports zero mismatches,
+2,330/2,330 lazy Canonical reconstructions equal the old JSON objects, and a
+same-directory second build produced identical manifest and SQLite bytes.
 
 For the second fingerprint the extractor observed 5,193 files, 5,069 UnityFS
 bundles, and 2,305 StageInfo charts in 725 sources. It resolved and exported
@@ -34,6 +38,11 @@ only the first fingerprint. The second row describes the current source tree
 and will become part of a later release. Its `GameAssembly.dll` and
 `global-metadata.dat` differ from the first profile, so static offsets are not
 shared even though the proven disk parser family is shared.
+
+The Store writer uses the registered parser/grouping family and therefore has
+a formal gate for both rows. Only the first row was rebuilt as a Store in the
+2026-08-12 acceptance run. The second depot had already been removed to save
+space, so no new Store result is claimed for it.
 
 This table does not claim that every installation with a similar game version
 is compatible. DLC ownership and updates can change the full fingerprint.
@@ -52,6 +61,10 @@ produce a nonformal M8 evidence run. Its manifest contains
 turns that run into formal support. Compare the resulting structure, document
 counterexamples, independently audit the full batch, and only then register a
 new profile.
+
+`extract-store` deliberately has no research override. An unknown fingerprint
+must complete the research evidence chain and be registered before it can be
+used as a long-term Store source.
 
 Never bypass the gate by editing a diagnostic fingerprint string. Formal
 support requires current-file hashes and repeatable parser evidence.

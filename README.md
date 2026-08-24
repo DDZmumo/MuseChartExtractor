@@ -37,8 +37,8 @@ musedash-chart-extractor --version
 
 #### 当前 `main`（Unreleased）
 
-第二个正式资源 profile、未知 fingerprint 的完整 research batch 和独立全量审计目前只在
-当前源码中提供：
+第二个正式资源 profile、Compact Store、未知 fingerprint 的完整 research batch 和独立
+全量审计目前只在当前源码中提供：
 
 ```powershell
 git clone https://github.com/DDZmumo/MuseChartExtractor.git
@@ -75,15 +75,21 @@ musedash-chart-extractor probe --game-dir $GameDir --output-dir diagnostics
 musedash-chart-extractor candidates --game-dir $GameDir --output-dir diagnostics
 musedash-chart-extractor index --game-dir $GameDir --output diagnostics/song_chart_index.json
 musedash-chart-extractor grouping-census --game-dir $GameDir --output-dir diagnostics
-musedash-chart-extractor extract-all --game-dir $GameDir --output extracted
+musedash-chart-extractor extract-store --game-dir $GameDir --output MuseDashChartStore
+musedash-chart-extractor audit-store `
+  --store MuseDashChartStore `
+  --game-dir $GameDir `
+  --report diagnostics/store_audit.json
 ```
 
-结果写入 `extracted/charts/<song_id>/<chart_id>.json`，最后原子写入
-`extracted/manifest.json`。完整无损 JSON 体积较大：最新 fingerprint 的 2,330 张谱面
-约占 13.1 GiB。重复验证应原地覆盖，不要保留重复输出树。
+结果以原始 Odin payload + SQLite 通用索引写入 `MuseDashChartStore/`，最后原子写入
+`store.json`。最新 fingerprint 的完整 Store 约 1.026 GiB，是迁移前 13.121 GiB 展开 JSON
+树的 7.8189%；本地旧树在全量审计和逐图等价通过后已清理。JSON/CSV 仍可通过
+`ChartStore.load_chart()` 按单图导出；需要兼容旧流程时
+仍可显式运行 `extract-all --output extracted`，但不建议把展开 JSON 当作长期数据库。
 
 > [!IMPORTANT]
-> `extracted/` 含用户本机官方衍生数据，已被 Git 忽略。请勿提交、发布或再分发完整谱面、
+> `MuseDashChartStore/` 和 `extracted/` 含用户本机官方衍生数据，已被 Git 忽略。请勿提交、发布或再分发完整谱面、
 > AssetBundle、音频、Texture、DLC 内容或可还原这些内容的 dump。
 
 全部子命令、输出文件和研究模式说明见
@@ -98,6 +104,7 @@ musedash-chart-extractor extract-all --game-dir $GameDir --output extracted
 - **可解释候选发现**：每个 candidate 保留 score、evidence、counterevidence、PathID 与来源哈希。
 - **歌曲与难度索引**：从 Addressables、StageInfo 与 ALBUM 配置恢复稳定 song/chart 关系。
 - **Canonical Chart schema 1.1**：单一 raw-record table，event 仅通过原始 index 引用。
+- **Compact Store schema 1.0**：原始 Odin bytes 内容寻址，SQLite 只保存共享索引，单图懒解析。
 - **未知信息保真**：未知字段与未知 type 不会被删除或强行映射。
 - **验证与独立审计**：检查来源 SHA、Decimal、事件结构、raw index 闭包与全量文件 manifest。
 - **通用输出接口**：内置 JSON、CSV 与 Python API，不绑定 MusePlay、YOLO 或 AutoPlay。
@@ -112,9 +119,10 @@ flowchart LR
     C --> D["Chart Discovery"]
     D --> E["Odin Chart Parser"]
     E --> F["Song / Difficulty Index"]
-    F --> G["Canonical Chart 1.1"]
-    G --> H["Validation"]
-    H --> I["JSON / CSV / Python API"]
+    F --> G["Validation"]
+    G --> H["Odin Store 1.0 + SQLite"]
+    H --> I["Lazy Canonical Chart 1.1"]
+    I --> J["JSON / CSV / Python API"]
 ```
 
 项目始终遵循：**先证明，再抽象；先解析一张，再解析全部；先保真，再做转换。**
@@ -124,12 +132,16 @@ flowchart LR
 
 | 项目 | 当前状态 |
 |---|---|
-| ROADMAP | Phase 0–10 完成，M0–M9 达到 |
+| ROADMAP | Phase 0–11 完成，当前 fingerprint 的 M0–M10 达到 |
 | Canonical schema | `1.1.0` |
+| Store schema | `1.0.0` |
 | 正式资源 profiles | 2 个 exact inventory fingerprints |
 | 最新实盘 | 2,331 candidates；2,330 success；1 uncertain；0 failed |
 | 最新全量输出 | 1,204,824 exported events；1,817,952 raw records |
-| 确定性 | 两轮 manifest 逐字节相同，16 类最终审计 mismatch 均为 0 |
+| 最新 Compact Store | 2,331 payloads；1,101,577,861 bytes（含审计报告） |
+| Store 审计 | 13 类 mismatch 全为 0；733 sources / 2,331 charts 源复核通过 |
+| 确定性 | 两轮 Store manifest、SQLite、logical digest、payload set 均相同 |
+| Canonical 等价 | 2,330 / 2,330 resolved charts 完全相等，mismatch 0 |
 | 语义验证 | M7 partial，不宣称全库逐事件 100% 对照 |
 
 正式支持按完整安装 fingerprint 判定，而不是按游戏营销版本或 Steam BuildID 猜测：
@@ -144,27 +156,26 @@ flowchart LR
 
 > [!NOTE]
 > “精确核对”目前表示磁盘来源、文件哈希、结构解析、raw-record accounting 和重复执行
-> 确定性已闭环。独立逐事件参考尚未覆盖全部谱面，因此 timing/type/lane/duration 的全库
+> 确定性已闭环；Compact Store 还与旧 Canonical 树逐张完全比较。本轮没有新增人工视频
+> 复核。独立逐事件参考尚未覆盖全部谱面，因此 timing/type/lane/duration 的全库
 > 比较仍明确为 `not_compared`；`tutorial_v2_map1` 也继续保留为 unresolved/uncertain。
 
 ## Python API
 
 ```python
-from musedash_chart_extractor import CsvExporter, JsonExporter, MuseDashInstallation
+from musedash_chart_extractor import ChartStore, CsvExporter, JsonExporter
 
-game = MuseDashInstallation.open(r"D:\SteamLibrary\steamapps\common\Muse Dash")
-charts = game.extract_charts(
-    output_dir="extracted",
-    diagnostics_dir="diagnostics",
-)
+with ChartStore.open("MuseDashChartStore") as store:
+    refs = list(store.iter_charts())
+    chart = store.load_chart("urban_magic_map3")
 
-for chart in charts:
-    JsonExporter(indent=None).export(chart, f"exports/{chart['chart_id']}.json")
-    CsvExporter().export(chart, f"exports/{chart['chart_id']}.csv")
+JsonExporter(indent=None).export(chart, "exports/urban_magic_map3.json")
+CsvExporter().export(chart, "exports/urban_magic_map3.csv")
 ```
 
 `JsonExporter` 保留完整 Canonical Model。`CsvExporter` 是明确的扁平事件视图，
-不会修改或替代内部 raw/unknown 数据。`extract_charts()` 使用已生成的 diagnostics 门禁文件；
+不会修改或替代内部 raw/unknown 数据。`iter_charts()` 只查询 SQLite；只有
+`load_chart()` 才解析单张 payload。`extract_store()` 使用已生成的 diagnostics 门禁文件；
 完整顺序见 [CLI Reference](docs/cli-reference.md#完整批量提取流程)。
 
 ## 项目文档
@@ -173,7 +184,7 @@ for chart in charts:
 |---|---|
 | [ROADMAP.md](ROADMAP.md) | 主执行规范、Phase 验收门槛与里程碑 |
 | [CLI Reference](docs/cli-reference.md) | 全部命令、输出与本地研究流程 |
-| [Canonical Schema](docs/schema.md) | schema `1.1.0`、raw 引用与保真规则 |
+| [Canonical / Store Schema](docs/schema.md) | logical `1.1.0`、physical Store `1.0.0` 与保真规则 |
 | [Supported Versions](docs/supported-versions.md) | 正式 fingerprints 与未知版本策略 |
 | [Validation Scope](docs/validation.md) | 结构、aggregate 与逐事件验证边界 |
 | [Architecture](docs/architecture.md) | 模块职责与 Disk-to-Parser 边界 |

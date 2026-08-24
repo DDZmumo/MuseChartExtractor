@@ -26,6 +26,7 @@ from .scanner import (
     scan_game_directory,
     validate_game_directory,
 )
+from .store.schema import path_is_link, reject_symlink_path
 
 
 _PROFILE_GATED_COMMANDS = frozenset(
@@ -301,6 +302,60 @@ def _build_parser() -> argparse.ArgumentParser:
         help="emit progress after this many bundles (default: 50; 0 disables)",
     )
     _add_unsupported_research_override(extract_all)
+
+    extract_store = commands.add_parser(
+        "extract-store",
+        help="build a compact content-addressed Odin Store for a supported installation",
+    )
+    extract_store.add_argument("--game-dir", required=True, type=Path)
+    extract_store.add_argument(
+        "--output",
+        type=Path,
+        default=Path("MuseDashChartStore"),
+        help="compact local Store directory (default: MuseDashChartStore)",
+    )
+    extract_store.add_argument(
+        "--candidate-file",
+        type=Path,
+        default=Path("diagnostics/chart_candidates.jsonl"),
+    )
+    extract_store.add_argument(
+        "--song-index",
+        type=Path,
+        default=Path("diagnostics/song_chart_index.json"),
+    )
+    extract_store.add_argument(
+        "--bundle-inventory",
+        type=Path,
+        default=Path("diagnostics/bundle_inventory.jsonl"),
+    )
+    extract_store.add_argument(
+        "--grouping-census-summary",
+        type=Path,
+        default=Path("diagnostics/grouping_census_summary.json"),
+    )
+    extract_store.add_argument(
+        "--progress-every",
+        type=int,
+        default=50,
+        help="emit progress after this many bundles (default: 50; 0 disables)",
+    )
+
+    audit_store = commands.add_parser(
+        "audit-store",
+        help="fail-closed audit of a compact Odin Store",
+    )
+    audit_store.add_argument("--store", required=True, type=Path)
+    audit_store.add_argument(
+        "--game-dir",
+        type=Path,
+        help="optional source installation used to reverify bundle and PathID evidence",
+    )
+    audit_store.add_argument(
+        "--report",
+        type=Path,
+        default=Path("diagnostics/store_audit.json"),
+    )
     return parser
 
 
@@ -935,6 +990,10 @@ def _run_extract_all(
     from .installation import MuseDashInstallation
 
     game_dir = validate_game_directory(arguments.game_dir)
+    if path_is_link(arguments.output.expanduser()):
+        raise ScannerError(
+            f"batch output must not be a symbolic link or junction: {arguments.output}"
+        )
     output_dir = arguments.output.expanduser().resolve()
     if _path_is_within(output_dir, game_dir):
         raise ScannerError(
@@ -989,6 +1048,121 @@ def _run_extract_all(
     return 0 if manifest["milestone_status"] == "M8-achieved" else 1
 
 
+def _run_extract_store(
+    arguments: argparse.Namespace,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    from .installation import MuseDashInstallation
+
+    game_dir = validate_game_directory(arguments.game_dir)
+    requested_output = arguments.output.expanduser()
+    if path_is_link(requested_output):
+        raise ScannerError(
+            f"store output must not be a symbolic link or junction: {requested_output}"
+        )
+    output_dir = requested_output.resolve()
+    if _path_is_within(output_dir, game_dir):
+        raise ScannerError(
+            f"output directory must not be inside the game directory: {output_dir}"
+        )
+    if arguments.progress_every < 0:
+        raise ScannerError("progress interval cannot be negative")
+
+    def progress(current: int, total: int, source: str) -> None:
+        every = arguments.progress_every
+        if every > 0 and (current % every == 0 or current == total):
+            print(
+                f"extract store: {current}/{total} bundles ({source})",
+                file=stderr,
+            )
+
+    installation = MuseDashInstallation.open(game_dir)
+    manifest = installation.extract_store(
+        output_dir=output_dir,
+        candidate_file=arguments.candidate_file,
+        song_index_file=arguments.song_index,
+        bundle_inventory_file=arguments.bundle_inventory,
+        grouping_census_summary_file=arguments.grouping_census_summary,
+        progress=progress,
+    )
+    summary = {
+        "status": manifest["status"],
+        "candidate_count": manifest["candidate_count"],
+        "source_count": manifest["source_count"],
+        "payload_count": manifest["payload_count"],
+        "payload_byte_count": manifest["payload_byte_count"],
+        "raw_record_count": manifest["raw_record_count"],
+        "logical_event_count": manifest["logical_event_count"],
+        "status_counts": manifest["status_counts"],
+        "logical_store_digest": manifest["logical_store_digest"],
+        "store_manifest": str((output_dir / "store.json").resolve()),
+    }
+    print(json.dumps(summary, ensure_ascii=False, sort_keys=True), file=stdout)
+    phase_gate = manifest.get("phase_gate")
+    passed = isinstance(phase_gate, dict) and all(value is True for value in phase_gate.values())
+    return 0 if passed else 1
+
+
+def _run_audit_store(arguments: argparse.Namespace, stdout: TextIO) -> int:
+    from .store.audit import audit_chart_store
+
+    requested_store = arguments.store.expanduser()
+    if path_is_link(requested_store):
+        raise ScannerError(
+            f"store root must not be a symbolic link or junction: {requested_store}"
+        )
+    store_dir = requested_store.resolve(strict=False)
+    game_dir = (
+        validate_game_directory(arguments.game_dir)
+        if arguments.game_dir is not None
+        else None
+    )
+    requested_report = arguments.report.expanduser()
+    if path_is_link(requested_report):
+        raise ScannerError(
+            f"audit report must not be a symbolic link or junction: {requested_report}"
+        )
+    lexical_report_path = requested_report.absolute()
+    try:
+        lexical_report_path.relative_to(store_dir)
+    except ValueError:
+        pass
+    else:
+        reject_symlink_path(
+            store_dir, lexical_report_path, context="store audit report path"
+        )
+    report_path = requested_report.resolve()
+    if _path_is_within(report_path, store_dir):
+        allowed_store_audit_root = (store_dir / "audit").resolve()
+        if not _path_is_within(report_path, allowed_store_audit_root):
+            raise ScannerError(
+                "audit report inside a Store must be written below its audit directory"
+            )
+    if game_dir is not None and _path_is_within(report_path, game_dir):
+        raise ScannerError(
+            f"audit report must not be inside the game directory: {report_path}"
+        )
+    report = audit_chart_store(store_dir, game_dir=game_dir)
+    destination = write_json(report_path, report)
+    counts = report.get("counts", {})
+    print(
+        json.dumps(
+            {
+                "status": report["status"],
+                "chart_count": counts.get("chart_count"),
+                "payload_count": counts.get("payload_count"),
+                "mismatch_counts": report["mismatch_counts"],
+                "store_audit": str(destination.resolve()),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
+        file=stdout,
+    )
+    return 0 if report["status"] == "passed" else 1
+
+
 def run(
     argv: Sequence[str] | None = None,
     *,
@@ -1024,6 +1198,10 @@ def run(
             return _run_grouping_census(arguments, output, errors)
         if arguments.command == "extract-all":
             return _run_extract_all(arguments, output, errors)
+        if arguments.command == "extract-store":
+            return _run_extract_store(arguments, output, errors)
+        if arguments.command == "audit-store":
+            return _run_audit_store(arguments, output)
     except (ScannerError, OSError) as exc:
         print(f"error: {exc}", file=errors)
         return 2

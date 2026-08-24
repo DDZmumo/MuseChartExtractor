@@ -31,7 +31,9 @@ Unity / Addressables 资源解析
         ↓
 验证
         ↓
-JSON / CSV / 第三方自定义 Exporter
+原始 Odin + SQLite Compact Store
+        ↓
+按需 Canonical / JSON / CSV / 第三方自定义 Exporter
 ```
 
 项目核心只负责：
@@ -40,6 +42,7 @@ JSON / CSV / 第三方自定义 Exporter
 - 定位谱面
 - 解析谱面
 - 验证谱面
+- 以通用、可审计的本地 Store 保存原始谱面和共享索引
 - 导出标准结构化数据
 - 提供通用转换接口
 
@@ -174,7 +177,7 @@ extractor version
 
 # 2. 项目阶段总览
 
-完整路线划分为 11 个阶段（Phase 0–10）：
+完整路线划分为 12 个阶段（Phase 0–11）：
 
 ```text
 Phase 0   Repository Bootstrap
@@ -188,6 +191,7 @@ Phase 7   Canonical Chart Model
 Phase 8   Validation & Cross-checking
 Phase 9   Batch Extraction
 Phase 10  Public API / Exporter / Open-source Hardening
+Phase 11  Compact Binary Chart Store
 ```
 
 一个阶段没有通过验收门槛，不进入下一阶段。
@@ -195,7 +199,7 @@ Phase 10  Public API / Exporter / Open-source Hardening
 当前源码已在两个 exact fingerprint 上完成 Phase 1–9：
 `sha256:1821d79ef6d53bca76c60491a2395496054fa473c31482ecc73b8d866c5f0ab5`
 和 `sha256:d9108183177ac7c4821b466d28e0920d8a4a9bcd490a0edde956be3681233222`。
-第一个 fingerprint 还已通过 Phase 0–10，M0–M9 已达到。`v0.1.0` 对应 revision `9158640`；
+第一个 fingerprint 还已通过 Phase 0–11，M0–M10 已达到。`v0.1.0` 对应 revision `9158640`；
 main push 与 tag 的两次真实 GitHub Actions 均通过完整测试/package 门禁，tag
 workflow 随后创建了包含已审计 wheel/sdist 的公共 GitHub Release。该发布物只含第一个
 profile；第二个 profile 是当前源码的 Unreleased 变更。这个边界不表示其他游戏 fingerprint
@@ -1426,6 +1430,108 @@ CLI 只是 API 的薄封装。
 
 ---
 
+# Phase 11 — Compact Binary Chart Store
+
+## 目标
+
+把完整谱面的默认长期存储从展开 Canonical JSON 改为游戏磁盘中的原始
+`serializationData.SerializedBytes`，并用标准库 SQLite 保存通用索引。读取单张谱面时
+才严格解析 Odin、连接共享 note config/song metadata，并生成不变的 Canonical
+schema `1.1.0`。
+
+物理 Store schema 独立版本化为 `1.0.0`：
+
+```text
+MuseDashChartStore/
+├── store.json
+├── index.sqlite3
+├── payloads/
+│   └── sha256/<first-two-hex>/<full-sha256>.odin
+└── audit/
+    └── store_audit.json
+```
+
+JSON/CSV 仍是按需 Exporter，不再是默认数据库格式。核心继续保持通用；依赖方向只能是
+下游项目调用 `MuseDashChartExtractor`，Store API 不包含 MusePlay、YOLO 或 AutoPlay
+适配器。
+
+## 必做任务
+
+- payload 逐字节保存原始 Odin Binary，不转为 JSON integer array，不自定义压缩；
+- SHA-256 内容寻址、跨 chart/重跑自动去重；
+- SQLite 只保存 metadata/source/payload/chart/StageInfo/song/note-config 索引，不保存
+  payload BLOB；
+- StageInfo envelope 除 `SerializedBytes` 外完整保留，包括 unknown、sceneEvents、
+  `SerializedFormat` 和引用信息；
+- note config 全局只存一次，chart 只保存 UID 引用；
+- `ChartStore.iter_charts()` 不解析 payload，`read_payload()` 校验 SHA 后返回 bytes，
+  `load_chart()` 才重建 Canonical `1.1.0`；
+- 写入使用 `.building`、同目录临时文件、SQLite 事务和最后原子发布的 `store.json`；
+- 审计必须 fail-closed 检查 SQLite、ID/FK、payload exact file set、SHA/size、Odin EOF、
+  StageInfo envelope、raw/logical/sentinel counts 和可选游戏源 bundle/PathID；
+- Store、`.odin`、SQLite 和官方衍生输出不得进入 Git、sdist 或 wheel。
+
+## 验收门槛
+
+- [x] synthetic fixtures 覆盖 exact `0x00`–`0xff`、payload dedup、unknown 字段/type、
+  uncertain chart、损坏/truncated/wrong-hash、FK/manifest/count、path traversal、
+  casefold collision、中断写入和确定性重跑；
+- [x] 当前正式 fingerprint 的全部 2,331 candidates 都有 Store row 和原始 payload；
+- [x] 2,330 success、1 explicit uncertain、0 failed；
+- [x] 2,331 个 payload 严格解析到 EOF，raw/logical 总数分别为 1,818,155 / 1,204,898；
+- [x] 独立审计的 13 类 mismatch 全为 0，并从游戏重新验证 733 sources / 2,331 PathID；
+- [x] 2,330 张 resolved chart 与旧 Canonical `1.1.0` 逐张完全相等，uncertain ID 集合相等；
+- [x] 同一 Store 目录第二次构建不生成 staged payload，logical digest、payload-set digest、
+  manifest 和 SQLite 均逐字节相同；
+- [x] Store 总大小小于旧 13.1 GiB JSON 树的 25%；
+- [x] 旧 JSON 在 Store 审计和等价检查完成前未删除。
+- [x] 验收通过后只删除已核对的旧 `extracted/` 树，Store、diagnostics 和研究证据保留。
+
+## 2026-08-12 实盘证据
+
+在 fingerprint
+`sha256:1821d79ef6d53bca76c60491a2395496054fa473c31482ecc73b8d866c5f0ab5`
+上，从 `E:\SteamLibrary\steamapps\common\Muse Dash` 只读建立 Store：
+
+```text
+candidates / sources:             2,331 / 733
+success / uncertain / failed:     2,330 / 1 / 0
+payload files / bytes:            2,331 / 1,053,670,885
+SQLite bytes:                     47,308,800
+Store bytes including audit:      1,101,577,861
+pre-cleanup expanded JSON bytes:  14,088,644,042
+Store / old tree:                 7.8189%
+raw records / logical events:     1,818,155 / 1,204,898
+logical Store digest:             0579d6943657c736bda9494f14a6c312ad44a2b9300b5ea858070a69aaa24668
+```
+
+独立 audit report 为 2,227 bytes、SHA-256
+`c5a4c19b411fba35f130331720f1d33564a55f1b89fd23bccf376a8c6334426d`；
+SQLite integrity/FK 和全部 13 类 mismatch 为 0。流式 Canonical 等价检查比较
+2,330 / 2,330 张，mismatch 为 0；两侧 raw/event 分别为 1,817,952 / 1,204,824，
+两侧稳定语义字节均为 14,086,035,191，全库 digest 均为
+`621f8dbebabf388acce08e8cf6c54cbd1d3f5ea08c040e3af5dc4d42c52d67f7`。
+
+第二次原地构建没有产生 staged payload；两次 manifest 均为 595,949 bytes、SHA-256
+`53026764a56aa95fa6acb0204e6328b11ed630f7c55a8912154e3a7ce94d939d`，
+两次 SQLite 均为 47,308,800 bytes、SHA-256
+`d3f653268a092f9356d5cb3948fa724d4abd3bef7300ae5f23011e79a7a49722`，
+payload-set digest 均为
+`2f00559c1b8761e0c8143eb384695eaab341007a0ad2581d152a0627cbf71533`。
+
+本轮没有新增人工视频逐事件复核；沿用此前已记录的 M4 证据，并以源 bundle/PathID、
+payload SHA、严格 EOF、全量结构审计和 Canonical 等价证明本次存储迁移。M7 仍是 partial。
+当前 fingerprint 的 **M10 达到**。第二个正式 fingerprint 的 Phase 1–9 证据仍有效，
+但其旧 depot 已按先前空间策略移除，本轮没有伪称为它重新建立 Store。
+
+等价报告落盘并独立核对后，已删除唯一目标
+`D:\Projects\PythonP\MuseChartExtractor\extracted`：2,331 个文件、
+14,088,644,042 bytes。删除前解析路径与 literal path 完全一致，整棵树没有 reparse point；
+删除后 Store、`diagnostics/` 和 `experimental/` 均存在，Store manifest、SQLite 与 audit
+哈希不变。该删除不经过回收站，旧展开 JSON 不再作为长期存储保留。
+
+---
+
 # 3. 推荐最终仓库结构
 
 当项目进入稳定阶段后：
@@ -1461,6 +1567,13 @@ musedash-chart-extractor/
 │       │   ├── indexing.py
 │       │   └── validator.py
 │       │
+│       ├── store/
+│       │   ├── schema.py
+│       │   ├── writer.py
+│       │   ├── reader.py
+│       │   ├── audit.py
+│       │   └── equivalence.py
+│       │
 │       ├── exporters/
 │       │   ├── base.py
 │       │   ├── json_exporter.py
@@ -1492,6 +1605,8 @@ musedash-chart-extractor probe
 musedash-chart-extractor candidates
 musedash-chart-extractor extract
 musedash-chart-extractor extract-all
+musedash-chart-extractor extract-store
+musedash-chart-extractor audit-store
 musedash-chart-extractor validate
 ```
 
@@ -1729,10 +1844,21 @@ CLI 和 scanner 可运行。
 
 ---
 
+## M10 — Compact Store
+
+原始 Odin payload 以内容寻址方式存储，SQLite 只保存共享索引；单图可以懒加载为
+Canonical `1.1.0`。全量审计、旧 JSON 流式等价比较和同目录确定性重跑均通过。
+
+当前 fingerprint 已完成实盘验收，M10 达到。该结论不等于全库逐事件人工语义验证。
+
+---
+
 # 11. 当前最优先任务
 
-M9 已完成，第二个真实 fingerprint 的 Phase 1–9 兼容证据链也已闭合。当前首要研究工作
-不是增加 GUI 或下游适配器，而是扩大独立逐事件参考覆盖、恢复
+M10 已在当前 fingerprint 上完成，第二个真实 fingerprint 的 Phase 1–9 兼容证据链也已
+闭合。旧 `extracted/` 已在 Store 全量审计与 2,330 张逐图等价检查通过后精确删除；默认
+长期数据只保留约 1.026 GiB 的 Compact Store。当前首要研究工作不是增加 GUI 或下游
+适配器，而是扩大独立逐事件参考覆盖、恢复
 `tutorial_v2_map1` 的 song identity，并在获得第三个真实 fingerprint 时重复同一证据链。
 未知版本默认继续保持 probe-only；显式 research batch 也必须通过完整证据门禁并标记为
 非正式，不能通过降低门禁换取表面兼容。
@@ -1765,6 +1891,9 @@ M9 已完成，第二个真实 fingerprint 的 Phase 1–9 兼容证据链也已
 - [x] 核心代码不绑定 MusePlay、YOLO 或 AutoPlay
 - [x] 首次受版本控制的 revision 已通过真实 CI
 - [x] 公共仓库 URL、`0.1.0` changelog、tag/release 已建立
+- [x] 默认长期存储使用原始 Odin payload + SQLite 通用索引
+- [x] Store 可以懒加载并精确重建 Canonical `1.1.0`
+- [x] Store 全量审计、旧 JSON 等价比较和确定性重跑通过
 
 ---
 

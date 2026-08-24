@@ -9,5 +9,11 @@ prune diagnostics
 prune experimental
 prune extracted
 prune exports
+prune MuseDashChartStore
+prune payloads
+global-exclude *.odin
+global-exclude *.sqlite3
+global-exclude store.json
+global-exclude store_audit.json
 global-exclude __pycache__
 global-exclude *.py[cod]

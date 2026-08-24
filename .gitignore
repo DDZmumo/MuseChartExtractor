@@ -12,6 +12,12 @@ build/
 dist/
 extracted/
 exports/
+MuseDashChartStore/
+payloads/
+*.odin
+*.sqlite3
+store.json
+store_audit.json
 .venv/
 venv/
 .tox/

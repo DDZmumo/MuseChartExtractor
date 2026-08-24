@@ -18,6 +18,9 @@ from .scanner import (
     scan_game_directory,
     validate_game_directory,
 )
+from .store.schema import STORE_PARSER_VERSION
+from .store.schema import path_is_link
+from .store.writer import extract_chart_store
 
 CURRENT_GAME_FINGERPRINT = (
     "sha256:1821d79ef6d53bca76c60491a2395496054fa473c31482ecc73b8d866c5f0ab5"
@@ -251,6 +254,80 @@ class MuseDashInstallation:
             research_mode=research_mode,
         )
         return ExtractedChartCollection(output_dir=output, manifest=manifest)
+
+    def extract_store(
+        self,
+        *,
+        output_dir: str | Path = "MuseDashChartStore",
+        diagnostics_dir: str | Path = "diagnostics",
+        candidate_file: str | Path | None = None,
+        song_index_file: str | Path | None = None,
+        bundle_inventory_file: str | Path | None = None,
+        grouping_census_summary_file: str | Path | None = None,
+        progress: Callable[[int, int, str], None] | None = None,
+    ) -> dict[str, Any]:
+        """Build a compact Store only for an explicitly supported fingerprint."""
+
+        profile = self.require_supported()
+        diagnostics = Path(diagnostics_dir).expanduser().resolve()
+        requested_output = Path(output_dir).expanduser()
+        if path_is_link(requested_output):
+            raise ScannerError(
+                f"store output must not be a symbolic link or junction: {requested_output}"
+            )
+        output = requested_output.resolve()
+        candidate_path = Path(
+            candidate_file or diagnostics / "chart_candidates.jsonl"
+        ).expanduser().resolve()
+        song_index_path = Path(
+            song_index_file or diagnostics / "song_chart_index.json"
+        ).expanduser().resolve()
+        bundle_inventory_path = Path(
+            bundle_inventory_file or diagnostics / "bundle_inventory.jsonl"
+        ).expanduser().resolve()
+        census_path = Path(
+            grouping_census_summary_file
+            or diagnostics / "grouping_census_summary.json"
+        ).expanduser().resolve()
+        candidates = load_bundle_inventory(candidate_path)
+        bundle_reports = load_bundle_inventory(bundle_inventory_path)
+        song_index = _read_json_object(song_index_path, context="song/chart index")
+        census = _read_json_object(census_path, context="grouping census summary")
+        artifact_fingerprints = [
+            ("song/chart index", song_index.get("inventory_fingerprint")),
+            ("grouping census", census.get("inventory_fingerprint")),
+            *(
+                (
+                    f"chart candidate {position}",
+                    candidate.get("inventory_fingerprint"),
+                )
+                for position, candidate in enumerate(candidates)
+            ),
+        ]
+        for context, fingerprint in artifact_fingerprints:
+            _verify_artifact_fingerprint(
+                fingerprint,
+                expected=self.inventory_fingerprint,
+                context=context,
+            )
+        if census.get("grouping_rule_version") != profile.grouping_rule_version:
+            raise ScannerError(
+                "grouping census rule does not match the supported resource profile"
+            )
+        note_configs, note_provenance = resolve_note_data(self.root, bundle_reports)
+        return extract_chart_store(
+            self.root,
+            output,
+            candidates,
+            song_index,
+            grouping_census_summary=census,
+            note_configs_by_uid=note_configs,
+            note_data_provenance=note_provenance,
+            parser_family=profile.parser_family,
+            parser_version=STORE_PARSER_VERSION,
+            expected_candidate_count=census.get("candidate_count"),
+            progress=progress,
+        )
 
 
 __all__ = [

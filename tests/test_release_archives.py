@@ -91,6 +91,36 @@ class ReleaseArchiveAuditTests(unittest.TestCase):
                 ):
                     audit_archives(archives)
 
+    def test_rejects_store_directories_even_with_allowed_python_members(self) -> None:
+        for member in (
+            "musedash_chart_extractor/MuseDashChartStore/leak.py",
+            "musedash_chart_extractor/payloads/leak.py",
+        ):
+            with self.subTest(member=member), tempfile.TemporaryDirectory() as temporary:
+                archives = _write_archives(
+                    Path(temporary), extra_wheel_member=member
+                )
+                with self.assertRaisesRegex(
+                    ArchiveAuditError, "forbidden local or game-derived"
+                ):
+                    audit_archives(archives)
+
+    def test_rejects_store_payload_index_and_manifest_members(self) -> None:
+        for member in (
+            "musedash_chart_extractor/chart.ODIN",
+            "musedash_chart_extractor/index.SQLITE3",
+            "musedash_chart_extractor/STORE.JSON",
+            "musedash_chart_extractor/audit/store_AUDIT.JSON",
+        ):
+            with self.subTest(member=member), tempfile.TemporaryDirectory() as temporary:
+                archives = _write_archives(
+                    Path(temporary), extra_wheel_member=member
+                )
+                with self.assertRaisesRegex(
+                    ArchiveAuditError, "forbidden local or game-derived"
+                ):
+                    audit_archives(archives)
+
     def test_rejects_links_and_missing_license(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

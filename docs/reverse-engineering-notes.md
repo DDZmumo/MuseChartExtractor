@@ -1200,3 +1200,174 @@ This is exact storage, identity, and structural-accounting evidence. It does
 not change M7's partial status: full event-level timing/type/lane/duration truth
 is still `not_compared`, `is_air` is not canonicalized, and
 `tutorial_v2_map1` remains explicitly unresolved/uncertain.
+
+## 2026-08-12 — Compact Odin Store 1.0 full acceptance
+
+### Scope and unchanged evidence boundary
+
+The Store migration used the current formal fingerprint:
+
+```text
+sha256:1821d79ef6d53bca76c60491a2395496054fa473c31482ecc73b8d866c5f0ab5
+game directory: E:\SteamLibrary\steamapps\common\Muse Dash
+Addressables:  1.21.20
+build hash:    9ecc2d74a4045582f2aabf0f64c83581
+catalog SHA:   61059d3983d68b9b9e06ca580155c56bdc378882d68ed6c4acd6894ce58d6242
+settings SHA:  7dfad052f7bb4c3cd8aae77f6deadd3bf131d5bab7fdeaad21aefb1f0c258107
+```
+
+No new video or manual per-event review was possible in this run. The selected
+M4 human evidence recorded earlier was not replaced or broadened. Store
+acceptance instead proves that the storage migration preserves the exact disk
+payload, source identity, parser result, grouping accounting, and previously
+generated Canonical objects. M7 remains partial.
+
+The second formal fingerprint `d910...33222` remains registered from its
+completed Phase 1–9 evidence. Its old Steam depot was already removed under the
+previous disk-space policy, so this run did not rebuild or claim a Store for
+that unavailable resource set.
+
+### Physical Store
+
+`extract-store` was run directly against the game, not converted from the old
+JSON tree. Every StageInfo `SerializedBytes` value was checked against its
+candidate size/SHA, strictly parsed to EOF once, grouped, and written unchanged
+as:
+
+```text
+MuseDashChartStore/payloads/sha256/<prefix>/<sha256>.odin
+```
+
+The SQLite index stores the complete StageInfo envelope after removing only
+`SerializedBytes`. It also stores full metadata-only candidates, source
+fingerprints, ALBUM/song/index rows, global note configs once per UID, and chart
+to note-UID references. `tutorial_v2_map1` keeps its raw payload and is explicit
+`uncertain`; its missing song identity is not converted into a false match.
+
+Observed output:
+
+```text
+candidates / sources:             2,331 / 733
+success / uncertain / failed:     2,330 / 1 / 0
+payload count / bytes:            2,331 / 1,053,670,885
+unique payload SHA count:         2,331
+SQLite bytes:                     47,308,800
+manifest bytes:                   595,949
+Store files including audit:      2,334
+Store bytes including audit:      1,101,577,861
+raw records / logical events:     1,818,155 / 1,204,898
+charts with observed sentinel:    992
+logical Store digest:             0579d6943657c736bda9494f14a6c312ad44a2b9300b5ea858070a69aaa24668
+```
+
+All 2,331 payload SHA values are unique in this fingerprint, so content
+addressing produces no within-version byte saving beyond avoiding repeated
+expanded JSON. It still guarantees rerun and future cross-version deduplication.
+
+The pre-cleanup schema `1.1.0` tree was measured at:
+
+```text
+D:\Projects\PythonP\MuseChartExtractor\extracted
+files: 2,331
+bytes: 14,088,644,042 (13.121072 GiB)
+```
+
+The Store is 7.8189% of that tree, below the 25% acceptance ceiling. The old
+tree remained intact throughout Store construction, source audit, the first
+determinism rerun, and the final streaming equivalence pass. It was eligible
+for cleanup only after all of those gates passed; diagnostics and experimental
+evidence were never cleanup targets.
+
+### Independent Store audit
+
+The fail-closed auditor processed payloads one at a time and did not retain a
+library-wide byte/parse cache. With the game directory supplied it also
+reopened all source bundles and compared PathID, object type, payload and
+stripped StageInfo envelope:
+
+```text
+SQLite integrity_check:       ok
+foreign key violations:       0
+verified sources / charts:    733 / 2,331
+candidate/chart/payload IDs:  exact
+payload missing / extra:      0 / 0
+raw / logical / sentinel:     1,818,155 / 1,204,898 / 992
+all 13 mismatch categories:   0
+```
+
+The metadata-only report is 2,227 bytes with SHA-256
+`c5a4c19b411fba35f130331720f1d33564a55f1b89fd23bccf376a8c6334426d`.
+It is retained at both `diagnostics/store_audit.json` and the local-only
+`MuseDashChartStore/audit/store_audit.json`; neither copy contains events or
+payload bytes.
+
+### Canonical 1.1 streaming equivalence
+
+The comparison did not load the corpus into memory. For every successful chart
+it verified the old manifest path/size/SHA, loaded one old JSON object, lazily
+rebuilt the same chart from Store, encoded both with the same stable JSON
+function, compared them, updated corpus hashes, and released the pair.
+
+```text
+success ID sets equal:             true
+uncertain ID sets equal:           true (1 / 1)
+compared / equivalent:             2,330 / 2,330
+mismatch charts / total mismatch:  0 / 0
+raw records on each side:          1,817,952
+logical events on each side:       1,204,824
+semantic bytes on each side:       14,086,035,191
+canonical digest on each side:     621f8dbebabf388acce08e8cf6c54cbd1d3f5ea08c040e3af5dc4d42c52d67f7
+```
+
+The metadata-only equivalence report is 1,917 bytes with SHA-256
+`e76d429685ece4c31c5adcab58326f01055a654800ad257b962ac3b71f428732`.
+This proves the physical-format migration did not change Canonical `1.1.0`;
+it does not prove that every game semantic field has been independently
+interpreted.
+
+### Same-directory determinism
+
+A second `extract-store` run reused the same directory. During the run all
+2,331 final payloads remained present and the staging payload count stayed zero;
+the writer revalidated every existing payload size/SHA before reuse. The two
+runs produced identical values:
+
+```text
+manifest:          595,949 bytes
+manifest SHA:      53026764a56aa95fa6acb0204e6328b11ed630f7c55a8912154e3a7ce94d939d
+SQLite:            47,308,800 bytes
+SQLite SHA:        d3f653268a092f9356d5cb3948fa724d4abd3bef7300ae5f23011e79a7a49722
+logical digest:    0579d6943657c736bda9494f14a6c312ad44a2b9300b5ea858070a69aaa24668
+payload-set digest:2f00559c1b8761e0c8143eb384695eaab341007a0ad2581d152a0627cbf71533
+```
+
+All seven recorded determinism checks passed. This closes Phase 11 / M10 for
+the current fingerprint while preserving the offline, read-only and generic
+project boundary. These are the final values after rebuilding the same directory
+with the fail-closed note-UID foreign key and parser/profile checks enabled; the
+earlier pre-hardening index was not retained. The metadata-only determinism
+report is 1,569 bytes with SHA-256
+`e4ffa309aab38050d32017ef423ac3ffcb22c6b054a2c17313c3a26957ed4f32`.
+
+### Post-acceptance cleanup and final safeguards
+
+The final streaming equivalence run completed at 2026-08-12 03:42 local time
+with the same 1,917-byte report and SHA-256
+`e76d429685ece4c31c5adcab58326f01055a654800ad257b962ac3b71f428732`.
+Only then was the exact literal path
+`D:\Projects\PythonP\MuseChartExtractor\extracted` removed. Immediately before
+deletion it resolved byte-for-byte to the expected path, contained 2,331 files
+and 14,088,644,042 bytes, and had zero reparse points. The deletion did not use
+the recycle bin. Afterwards the target no longer existed, while
+`MuseDashChartStore/`, `diagnostics/`, and `experimental/` all remained.
+
+The retained Store still has manifest SHA-256
+`53026764a56aa95fa6acb0204e6328b11ed630f7c55a8912154e3a7ce94d939d`,
+SQLite SHA-256
+`d3f653268a092f9356d5cb3948fa724d4abd3bef7300ae5f23011e79a7a49722`,
+and audit SHA-256
+`c5a4c19b411fba35f130331720f1d33564a55f1b89fd23bccf376a8c6334426d`.
+The final code review also added a fail-closed regression for nested symlinks or
+Windows junctions in `.staging`; writer cleanup now rejects such a tree before
+calling recursive deletion. The complete non-local suite after that change was
+171 passed, 4 deselected, with 55 subtests passed.

@@ -8,13 +8,27 @@ from .installation import (
     MuseDashInstallation,
     UnknownGameVersionError,
 )
+from .store import (
+    ChartNotFoundError,
+    ChartRef,
+    ChartStore,
+    ChartStoreError,
+    STORE_SCHEMA_VERSION,
+    UnresolvedChartError,
+)
 
 __all__ = [
     "ChartExporter",
+    "ChartNotFoundError",
+    "ChartRef",
+    "ChartStore",
+    "ChartStoreError",
     "CsvExporter",
     "ExtractedChartCollection",
     "JsonExporter",
     "MuseDashInstallation",
+    "STORE_SCHEMA_VERSION",
+    "UnresolvedChartError",
     "UnknownGameVersionError",
     "__version__",
 ]

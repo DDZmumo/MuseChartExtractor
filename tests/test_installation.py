@@ -273,6 +273,31 @@ class InstallationApiTests(unittest.TestCase):
 
             self.assertFalse(extract_all.call_args.kwargs["research_mode"])
 
+    def test_extract_store_rejects_a_symbolic_link_output_before_resolution(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            game = root / "game"
+            game.mkdir()
+            output = root / "store-link"
+            installation = MuseDashInstallation(
+                root=game.resolve(),
+                inventory_fingerprint=CURRENT_GAME_FINGERPRINT,
+                profile=SUPPORTED_RESOURCE_PROFILES[CURRENT_GAME_FINGERPRINT],
+            )
+            original_is_symlink = Path.is_symlink
+
+            def is_symlink(path: Path) -> bool:
+                return path == output or original_is_symlink(path)
+
+            with patch.object(
+                Path, "is_symlink", autospec=True, side_effect=is_symlink
+            ):
+                with self.assertRaisesRegex(ScannerError, "symbolic link"):
+                    installation.extract_store(
+                        output_dir=output,
+                        diagnostics_dir=root / "missing-diagnostics",
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -24,7 +24,9 @@ FORBIDDEN_COMPONENTS = {
     "experimental",
     "extracted",
     "exports",
+    "musedashchartstore",
     "musedash_data",
+    "payloads",
     "streamingassets",
 }
 
@@ -58,6 +60,10 @@ WHEEL_DIST_INFO_FILES = {
     "entry_points.txt",
     "top_level.txt",
 }
+FORBIDDEN_FILE_NAMES = {
+    "store.json",
+    "store_audit.json",
+}
 FORBIDDEN_SUFFIXES = {
     ".assets",
     ".bundle",
@@ -67,9 +73,11 @@ FORBIDDEN_SUFFIXES = {
     ".mp3",
     ".mp4",
     ".ogg",
+    ".odin",
     ".png",
     ".ress",
     ".resource",
+    ".sqlite3",
     ".wav",
     ".webp",
 }
@@ -297,6 +305,9 @@ def audit_archive(path: str | Path) -> dict[str, Any]:
         parsed = PurePosixPath(name)
         components = {part.casefold() for part in parsed.parts}
         if components & FORBIDDEN_COMPONENTS:
+            forbidden.append(name)
+            continue
+        if parsed.name.casefold() in FORBIDDEN_FILE_NAMES:
             forbidden.append(name)
             continue
         if parsed.suffix.casefold() in FORBIDDEN_SUFFIXES:

@@ -28,7 +28,8 @@ Linux and macOS contributors can use the corresponding `bin/python` path.
 
 Use synthetic fixtures for unit tests. Never commit official charts, bundles,
 audio, textures, DLC data, full dumps, or generated files from `extracted/`
-or `exports/`.
+or `exports/`. Never commit `MuseDashChartStore/`, `.odin`, Store SQLite files,
+payload directories, or Store manifests/audit outputs derived from a game.
 
 Tests requiring a user-owned installation use the `local_game` marker:
 
@@ -48,3 +49,5 @@ Before opening a change, run:
 
 Inspect wheel and sdist contents. They must not contain `diagnostics/`,
 `experimental/`, `extracted/`, `exports/`, or any game-derived event data.
+They must also exclude `MuseDashChartStore/`, payload directories, `.odin`,
+`.sqlite3`, `store.json`, and `store_audit.json`.

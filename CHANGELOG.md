@@ -6,6 +6,17 @@ separately.
 
 ## [Unreleased]
 
+### Added
+
+- Add physical Chart Store schema `1.0.0`: exact Odin Binary payloads are
+  content-addressed by SHA-256 while standard-library SQLite stores source,
+  chart, StageInfo, song, and shared note-config indexes without payload BLOBs.
+- Add the lazy `ChartStore` API, formal-profile-gated `extract-store` command,
+  fail-closed `audit-store`, and a streaming Canonical-tree equivalence checker.
+- Add synthetic coverage for every byte value, payload deduplication, unknown
+  fields/types, uncertain charts, corruption, FK/manifest mismatches, traversal,
+  casefold collisions, interrupted writes, and deterministic reruns.
+
 ### Changed
 
 - Rework the README into a release-oriented project overview and move the
@@ -24,6 +35,15 @@ separately.
   a byte-identical manifest without retaining a duplicate chart tree.
 - Compile and smoke-test packaged tools in CI, and reject release tags that do
   not match the package version.
+- Make Compact Store the recommended long-term format while keeping Canonical
+  schema `1.1.0` and JSON/CSV exporters unchanged and available on demand.
+- Harden Store reruns and audits against nested symlink/junction cleanup,
+  stale payloads, report-path overwrite, parser/schema drift, dangling note UID
+  references, false phase-gate passes, and incomplete status-set comparisons.
+- Validate the latest real fingerprint as a 1,101,577,861-byte Store: 2,331
+  payloads, 2,330 success, one uncertain, zero failed, zero audit mismatches,
+  2,330/2,330 Canonical equivalence, and byte-identical second-run manifest and
+  SQLite index.
 
 ## [0.1.0] - 2026-08-11
 

@@ -310,9 +310,15 @@ def canonicalize_chart(
     experimental_chart: Mapping[str, Any],
     song_chart_index: Mapping[str, Any],
     validation_report: Mapping[str, Any] | None = None,
+    *,
+    extractor_version: str = __version__,
 ) -> CanonicalChart:
     """Convert one indexed Phase 5 chart without discarding recovered evidence."""
 
+    provenance_extractor_version = _string(
+        extractor_version,
+        context="extractor version",
+    )
     source_raw = _mapping(experimental_chart.get("source"), context="chart source")
     chart_id = _string(source_raw.get("asset_name"), context="chart asset name")
     song_row, chart_row = _find_index_entry(song_chart_index, chart_id)
@@ -360,7 +366,7 @@ def canonicalize_chart(
     catalog_source = _mapping(index_catalog.get("source"), context="index catalog source")
     object_type = _string(source_raw.get("object_type"), context="chart object type")
     provenance = SourceProvenance(
-        extractor_version=__version__,
+        extractor_version=provenance_extractor_version,
         bundle=_string(source_raw.get("bundle"), context="source bundle"),
         bundle_sha256=_string(
             source_raw.get("bundle_sha256"), context="source bundle SHA-256"

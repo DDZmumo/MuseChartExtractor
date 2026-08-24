@@ -182,6 +182,23 @@ class CanonicalChartTests(unittest.TestCase):
         )
         self.assertIn("is_air_not_yet_canonicalized", model.warnings)
 
+    def test_explicit_extractor_version_preserves_build_time_provenance(self) -> None:
+        model = canonicalize_chart(
+            _experimental(1),
+            _index(),
+            extractor_version="store-builder-1.2.3",
+        )
+
+        self.assertEqual(model.source.extractor_version, "store-builder-1.2.3")
+
+    def test_invalid_explicit_extractor_version_fails_loudly(self) -> None:
+        with self.assertRaisesRegex(CanonicalizationError, "extractor version"):
+            canonicalize_chart(
+                _experimental(1),
+                _index(),
+                extractor_version="",
+            )
+
     def test_mismatched_validation_report_fails_loudly(self) -> None:
         experimental = _experimental(1)
         validation = _validation(experimental)
